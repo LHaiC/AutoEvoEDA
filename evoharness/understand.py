@@ -3,7 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 import re
 
-from evoharness.agent_state import read_agent_memory
+from evoharness.agent_state import read_agent_memory, write_agent_exchange
+from evoharness.agents.codex import CodexBackend
 from evoharness.config import EvoConfig, load_config
 from evoharness.events import append_event
 from evoharness.reports import write_project_indexes
@@ -73,7 +74,23 @@ def _module_doc(repo: Path, prefix: str) -> str:
     )
 
 
-def run_understand(config_path: Path) -> None:
+def _understanding_prompt(memory: Path) -> str:
+    parts = ["You are the code-understanding agent. Enrich the deterministic repository memory below."]
+    for rel in [
+        "index.md",
+        "architecture.md",
+        "build_system.md",
+        "workflows/build.md",
+        "workflows/regression.md",
+        "workflows/benchmark.md",
+    ]:
+        path = memory / rel
+        if path.exists():
+            parts.extend(["", f"# {rel}", path.read_text()])
+    return "\n".join(parts).rstrip() + "\n"
+
+
+def run_understand(config_path: Path, use_agent: bool = False) -> None:
     cfg = load_config(config_path)
     repo = _repo(config_path, cfg)
     memory = _memory_dir(repo)
@@ -193,5 +210,32 @@ def run_understand(config_path: Path) -> None:
         ),
     )
 
-    append_event(repo, "understand", "code_understanding_written", 0, 0, "", {"modules": len(module_links)})
+    append_event(
+        repo,
+        "understand",
+        "code_understanding_written",
+        0,
+        0,
+        "",
+        {"modules": len(module_links), "agent_requested": use_agent},
+    )
+
+    if use_agent:
+        agent_id = cfg.agents.code_understanding.session_id
+        prompt = _understanding_prompt(memory)
+        result = CodexBackend(sandbox=cfg.agent.sandbox).run(prompt, repo, cfg.agent.timeout_s)
+        write_agent_exchange(repo, agent_id, prompt, result.stdout, result.stderr, result.ok)
+        _write(memory / "agent_notes.md", result.stdout)
+        append_event(
+            repo,
+            "understand",
+            "code_understanding_agent_finished",
+            0,
+            0,
+            "",
+            {"agent_id": agent_id, "ok": result.ok},
+        )
+        if not result.ok:
+            raise RuntimeError(f"code understanding agent failed; see .evo/agents/{agent_id}/last_response.md")
+
     write_project_indexes(repo)

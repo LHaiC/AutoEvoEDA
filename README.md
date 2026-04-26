@@ -100,9 +100,10 @@ Seed hierarchical code memory before long-running evolution:
 
 ```bash
 evo understand --config examples/abc/evo.yaml
+evo understand --config examples/abc/evo.yaml --agent
 ```
 
-This writes deterministic memory under `.evo/memory/code/`, including module summaries for allowed paths and workflow notes for build, regression, benchmark, and reward commands. Later understanding agents can enrich these files.
+This writes deterministic memory under `.evo/memory/code/`, including module summaries for allowed paths and workflow notes for build, regression, benchmark, and reward commands. Use `--agent` to ask Codex to enrich `.evo/memory/code/agent_notes.md` while preserving deterministic memory as the baseline.
 
 ## Read-Only GUI
 
