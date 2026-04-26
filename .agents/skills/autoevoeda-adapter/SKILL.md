@@ -5,7 +5,8 @@ description: >
   required prompts/scripts/memory files, evo.yaml multi-agent configuration,
   and evo CLI usage for long-running EDA evolution workflows. Use when asked
   to adapt a project to AutoEvoEDA, create multi-agent YAML, explain the evo
-  workflow, or lay out adapter scripts and artifacts.
+  workflow, lay out adapter scripts and artifacts, or modify this framework
+  codebase.
 argument-hint: "<project-repo> [goal-or-domain-agents]"
 ---
 
@@ -14,6 +15,8 @@ argument-hint: "<project-repo> [goal-or-domain-agents]"
 You are creating or updating an AutoEvoEDA adapter for: **$ARGUMENTS**.
 
 ## 1. Inspect the project
+
+If the task edits the AutoEvoEDA framework itself, read `references/project-internals.md` first.
 
 Identify concrete project facts before writing config:
 
@@ -49,7 +52,11 @@ Read `references/evo-yaml.md`. Keep values concrete and project-owned:
 
 Read `references/commands.md` before explaining how to run, pause, resume, abandon interrupted runs, inspect `.evo/`, or promote candidates.
 
-## 5. Verify
+## 5. Framework edits
+
+When changing framework behavior, keep patches small and update the narrow module that owns the behavior. Use `references/project-internals.md` to find the owner before editing.
+
+## 6. Verify
 
 Run or recommend the narrowest safe verification:
 
