@@ -214,3 +214,20 @@ evo session pause --config evo.yaml
 ```
 
 The daemon still runs the same guard and evaluator contract. It only adds a long-lived loop around the normal cycle runner.
+
+## Codex Session Resume
+
+Each role can keep a native Codex session id in `.evo/agents/<agent_id>/codex_session.txt`:
+
+```yaml
+agents:
+  coder:
+    session_id: coder-main
+    codex_session:
+      enabled: true
+      session_file: .evo/agents/coder-main/codex_session.txt
+      on_missing: new
+      on_resume_failure: new
+```
+
+The framework-level memory files remain the durable context. Native Codex resume is an optimization for continuity, not a correctness requirement.

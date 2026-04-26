@@ -6,6 +6,7 @@ import json
 
 from evoharness.agent_state import write_agent_exchange
 from evoharness.agents.codex import CodexBackend
+from evoharness.agents.session import run_codex_role
 from evoharness.config import EvoConfig, load_config
 from evoharness.events import append_event, run_dir, run_id
 from evoharness.evaluator_results import (
@@ -160,7 +161,7 @@ def run_one_cycle(
     _event(repo, run_id_value, "candidate_created", candidate, {"candidate": str(candidate.path)})
     agent = CodexBackend(sandbox=cfg.agent.sandbox)
 
-    agent_result = agent.run(prompt=prompt, cwd=candidate.path, timeout_s=cfg.agent.timeout_s)
+    agent_result = run_codex_role(repo, cfg.agents.coder, agent, prompt, candidate.path, cfg.agent.timeout_s)
     _write_text(cycle_dir / "codex.stdout", agent_result.stdout)
     _write_text(cycle_dir / "codex.stderr", agent_result.stderr)
     write_agent_exchange(repo, cfg.agents.coder.session_id, prompt, agent_result.stdout, agent_result.stderr, agent_result.ok)
@@ -181,7 +182,7 @@ def run_one_cycle(
     while not passed and cfg.repair.enabled and failed_result and repair_attempt < cfg.repair.max_attempts:
         repair_attempt += 1
         repair_prompt = _repair_prompt(repo, cfg, reason, failed_result)
-        repair = agent.run(repair_prompt, candidate.path, cfg.agent.timeout_s)
+        repair = run_codex_role(repo, cfg.agents.coder, agent, repair_prompt, candidate.path, cfg.agent.timeout_s)
         _write_text(cycle_dir / f"repair-{repair_attempt}.stdout", repair.stdout)
         _write_text(cycle_dir / f"repair-{repair_attempt}.stderr", repair.stderr)
         write_agent_exchange(repo, cfg.agents.coder.session_id, repair_prompt, repair.stdout, repair.stderr, repair.ok)

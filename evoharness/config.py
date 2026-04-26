@@ -87,8 +87,17 @@ class RulebaseConfig:
 
 
 @dataclass(frozen=True)
+class CodexSessionConfig:
+    enabled: bool
+    session_file: str
+    on_missing: str
+    on_resume_failure: str
+
+
+@dataclass(frozen=True)
 class AgentRoleConfig:
     session_id: str
+    codex_session: CodexSessionConfig
 
 
 @dataclass(frozen=True)
@@ -143,6 +152,28 @@ def _optional_section(data: dict[str, Any], name: str) -> dict[str, Any]:
     return value
 
 
+def _agent_role(data: dict[str, Any], name: str, default_session_id: str) -> AgentRoleConfig:
+    raw = data.get(name, {})
+    if not isinstance(raw, dict):
+        raise ValueError(f"agent role must be a mapping: {name}")
+    session_id = raw.get("session_id", default_session_id)
+    codex_data = raw.get("codex_session", {})
+    if not isinstance(codex_data, dict):
+        raise ValueError(f"codex_session must be a mapping: agents.{name}")
+    codex_session = {
+        "enabled": False,
+        "session_file": f".evo/agents/{session_id}/codex_session.txt",
+        "on_missing": "new",
+        "on_resume_failure": "new",
+        **codex_data,
+    }
+    for key in ["on_missing", "on_resume_failure"]:
+        if codex_session[key] not in {"new", "fail"}:
+            raise ValueError(f"agents.{name}.codex_session.{key} must be 'new' or 'fail'")
+    role = {key: value for key, value in raw.items() if key not in {"session_id", "codex_session"}}
+    return AgentRoleConfig(**role, session_id=session_id, codex_session=CodexSessionConfig(**codex_session))
+
+
 def load_config(path: Path) -> EvoConfig:
     data = yaml.safe_load(path.read_text())
     if not isinstance(data, dict):
@@ -172,12 +203,6 @@ def load_config(path: Path) -> EvoConfig:
         **_optional_section(data, "result_files"),
     }
     agents_data = _optional_section(data, "agents")
-    agents = {
-        "planner": {"session_id": "planner-main", **agents_data.get("planner", {})},
-        "coder": {"session_id": "coder-main", **agents_data.get("coder", {})},
-        "reviewer": {"session_id": "reviewer-main", **agents_data.get("reviewer", {})},
-        "code_understanding": {"session_id": "understand-main", **agents_data.get("code_understanding", {})},
-    }
 
     return EvoConfig(
         project=ProjectConfig(**_section(data, "project")),
@@ -194,9 +219,9 @@ def load_config(path: Path) -> EvoConfig:
         pool=PoolConfig(**pool),
         budget=BudgetConfig(**budget),
         agents=AgentsConfig(
-            planner=AgentRoleConfig(**agents["planner"]),
-            coder=AgentRoleConfig(**agents["coder"]),
-            reviewer=AgentRoleConfig(**agents["reviewer"]),
-            code_understanding=AgentRoleConfig(**agents["code_understanding"]),
+            planner=_agent_role(agents_data, "planner", "planner-main"),
+            coder=_agent_role(agents_data, "coder", "coder-main"),
+            reviewer=_agent_role(agents_data, "reviewer", "reviewer-main"),
+            code_understanding=_agent_role(agents_data, "code_understanding", "understand-main"),
         ),
     )

@@ -165,3 +165,18 @@ agents:
 ```
 
 Role memory is injected into future prompts as a stable framework-level context path for long-running runs.
+
+Optionally enable native Codex session resume for any role:
+
+```yaml
+agents:
+  coder:
+    session_id: coder-main
+    codex_session:
+      enabled: true
+      session_file: .evo/agents/coder-main/codex_session.txt
+      on_missing: new
+      on_resume_failure: new
+```
+
+When a session id exists, the harness tries `codex exec resume`. If it is missing or resume fails and the policy is `new`, the role starts a new Codex invocation and records the event under `.evo/agents/<agent_id>/codex_session_events.jsonl`.

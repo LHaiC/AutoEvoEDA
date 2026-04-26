@@ -78,7 +78,17 @@ agents:
     session_id: planner-main
   coder:
     session_id: coder-main
+    codex_session:
+      enabled: false
+      session_file: .evo/agents/coder-main/codex_session.txt
+      on_missing: new
+      on_resume_failure: new
   reviewer:
     session_id: reviewer-main
   code_understanding:
     session_id: understand-main
+    codex_session:
+      enabled: false
+      session_file: .evo/agents/understand-main/codex_session.txt
+      on_missing: new
+      on_resume_failure: new

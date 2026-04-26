@@ -5,6 +5,7 @@ import re
 
 from evoharness.agent_state import read_agent_memory, write_agent_exchange
 from evoharness.agents.codex import CodexBackend
+from evoharness.agents.session import run_codex_role
 from evoharness.config import EvoConfig, load_config
 from evoharness.events import append_event
 from evoharness.reports import write_project_indexes
@@ -223,7 +224,8 @@ def run_understand(config_path: Path, use_agent: bool = False) -> None:
     if use_agent:
         agent_id = cfg.agents.code_understanding.session_id
         prompt = _understanding_prompt(memory)
-        result = CodexBackend(sandbox=cfg.agent.sandbox).run(prompt, repo, cfg.agent.timeout_s)
+        agent = CodexBackend(sandbox=cfg.agent.sandbox)
+        result = run_codex_role(repo, cfg.agents.code_understanding, agent, prompt, repo, cfg.agent.timeout_s)
         write_agent_exchange(repo, agent_id, prompt, result.stdout, result.stderr, result.ok)
         _write(memory / "agent_notes.md", result.stdout)
         append_event(
