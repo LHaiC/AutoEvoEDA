@@ -33,3 +33,15 @@ pipeline:
   compare_regression: python scripts/compare_regression.py
   perf: bash scripts/run_perf.sh
   reward: python scripts/reward.py
+
+memory:
+  enabled: true
+  project_memory: .evo/memory/project.md
+  lessons: .evo/memory/lessons.jsonl
+  rejected_ideas: .evo/memory/rejected_ideas.jsonl
+  accepted_patterns: .evo/memory/accepted_patterns.md
+  inject_recent_cycles: 5
+
+human:
+  review_on_accept: false
+  stop_after_consecutive_rejects: 0

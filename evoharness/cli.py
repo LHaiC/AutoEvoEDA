@@ -12,13 +12,14 @@ def build_parser() -> argparse.ArgumentParser:
     run = subparsers.add_parser("run", help="run local evolution cycles")
     run.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
     run.add_argument("--cycles", type=int, default=1)
+    run.add_argument("--human-review", action="store_true", help="pause for review after all gates pass")
     return parser
 
 
 def main() -> None:
     args = build_parser().parse_args()
     if args.command == "run":
-        run_cycles(config_path=args.config, cycles=args.cycles)
+        run_cycles(config_path=args.config, cycles=args.cycles, human_review=args.human_review)
 
 
 if __name__ == "__main__":
