@@ -5,8 +5,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 import json
+from urllib.parse import parse_qs
 
 from evoharness.config import load_config
+from evoharness.promote import promote_cycle
+from evoharness.session import add_session_comment, set_session_status
 
 
 def _repo(config_path: Path) -> Path:
@@ -84,6 +87,12 @@ a {{ color: #0f5f8f; }}
 <h1>evo-harness dashboard</h1>
 <p>Read-only local view for <code>{escape(str(repo))}</code></p>
 <section><h2>Workflow</h2>{_workflow_graph()}</section>
+<section><h2>Controls</h2>
+<form method="post" action="/action/comment"><input name="text" placeholder="human steering comment" size="80"> <button>Comment</button></form>
+<form method="post" action="/action/pause"><button>Pause</button></form>
+<form method="post" action="/action/resume"><button>Resume</button></form>
+<form method="post" action="/action/promote"><input name="cycle" placeholder="cycle" size="6"> <input name="candidate" placeholder="candidate" size="8" value="1"> <button>Promote</button></form>
+</section>
 <section><h2>Session State</h2><pre>{escape(state)}</pre></section>
 <section><h2>History</h2><table><tr><th>Cycle</th><th>Candidate</th><th>Decision</th><th>Reason</th><th>Branch</th></tr>{rows}</table></section>
 <section><h2>Recent Events</h2><table><tr><th>Time</th><th>Type</th><th>Run</th><th>Payload</th></tr>{event_rows}</table></section>
@@ -98,6 +107,11 @@ def serve_gui(config_path: Path, host: str, port: int) -> None:
     repo = _repo(config_path)
 
     class Handler(BaseHTTPRequestHandler):
+        def _redirect(self) -> None:
+            self.send_response(303)
+            self.send_header("Location", "/")
+            self.end_headers()
+
         def do_GET(self) -> None:
             if self.path == "/" or self.path == "/index.html":
                 body = render_dashboard(repo).encode()
@@ -119,6 +133,26 @@ def serve_gui(config_path: Path, host: str, port: int) -> None:
                     self.wfile.write(body)
                     self.wfile.write(b"</pre>")
                     return
+            self.send_response(404)
+            self.end_headers()
+
+        def do_POST(self) -> None:
+            length = int(self.headers.get("Content-Length", "0"))
+            data = parse_qs(self.rfile.read(length).decode())
+            if self.path == "/action/comment":
+                add_session_comment(config_path, data.get("text", [""])[0])
+                return self._redirect()
+            if self.path == "/action/pause":
+                set_session_status(config_path, "paused")
+                return self._redirect()
+            if self.path == "/action/resume":
+                set_session_status(config_path, "running")
+                return self._redirect()
+            if self.path == "/action/promote":
+                cycle = int(data.get("cycle", ["0"])[0])
+                candidate = int(data.get("candidate", ["1"])[0])
+                promote_cycle(config_path, cycle, candidate)
+                return self._redirect()
             self.send_response(404)
             self.end_headers()
 

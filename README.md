@@ -146,7 +146,7 @@ Serve a local dashboard over `.evo` artifacts:
 evo gui --config examples/abc/evo.yaml --host 127.0.0.1 --port 8765
 ```
 
-The GUI is read-only. It displays workflow state, history, events, run documents, roadmap, and code-memory index.
+The GUI displays workflow state, history, events, run documents, roadmap, and code-memory index. It can also add session comments, pause/resume the daemon, and explicitly promote accepted candidates through the same file-backed APIs as the CLI.
 
 ## Agent Session Registry
 

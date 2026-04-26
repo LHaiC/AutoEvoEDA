@@ -215,6 +215,14 @@ evo session pause --config evo.yaml
 
 The daemon still runs the same guard and evaluator contract. It only adds a long-lived loop around the normal cycle runner.
 
+The local GUI exposes the same controls:
+
+```bash
+evo gui --config evo.yaml
+```
+
+Use it to add comments, pause or resume the daemon, and explicitly promote accepted candidates.
+
 ## Candidate Worktrees
 
 Rejected candidates can be removed after inspection:
