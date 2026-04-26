@@ -1,0 +1,35 @@
+project:
+  name: abc.logic
+  repo: .
+  champion_branch: evo-champion
+
+agent:
+  prompt_file: prompts/coder.md
+  timeout_s: 3600
+  sandbox: workspace-write
+
+workspace:
+  worktree_root: ../.evo-worktrees
+
+guards:
+  max_changed_files: 8
+  max_changed_lines: 600
+  allowed_paths:
+    - src/base/
+    - src/map/
+    - src/opt/
+    - src/aig/
+  forbidden_paths:
+    - evo.yaml
+    - scripts/
+    - .github/
+    - benchmarks/
+    - golden/
+    - results/
+
+pipeline:
+  build: bash scripts/build.sh
+  regression: bash scripts/run_regression.sh
+  compare_regression: python scripts/compare_regression.py
+  perf: bash scripts/run_perf.sh
+  reward: python scripts/reward.py

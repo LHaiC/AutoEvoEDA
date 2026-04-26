@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "evo-harness"
+version = "0.1.0"
+description = "Minimal local evolution harness for EDA projects"
+requires-python = ">=3.10"
+dependencies = ["PyYAML>=6.0"]
+
+[project.scripts]
+evo = "evoharness.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["evoharness*"]
