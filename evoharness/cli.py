@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import argparse
 
+from evoharness.gui import serve_gui
 from evoharness.pipeline.cycle import run_cycles
 from evoharness.promote import promote_cycle
 from evoharness.session import add_session_comment, session_status, set_session_status
@@ -26,6 +27,10 @@ def build_parser() -> argparse.ArgumentParser:
     session.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
     understand = subparsers.add_parser("understand", help="write deterministic code-understanding memory")
     understand.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
+    gui = subparsers.add_parser("gui", help="serve a read-only local dashboard")
+    gui.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
+    gui.add_argument("--host", default="127.0.0.1")
+    gui.add_argument("--port", type=int, default=8765)
     return parser
 
 
@@ -46,6 +51,8 @@ def main() -> None:
             print(set_session_status(args.config, "running"))
     if args.command == "understand":
         run_understand(args.config)
+    if args.command == "gui":
+        serve_gui(args.config, args.host, args.port)
 
 
 if __name__ == "__main__":

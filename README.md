@@ -103,3 +103,13 @@ evo understand --config examples/abc/evo.yaml
 ```
 
 This writes deterministic memory under `.evo/memory/code/`, including module summaries for allowed paths and workflow notes for build, regression, benchmark, and reward commands. Later understanding agents can enrich these files.
+
+## Read-Only GUI
+
+Serve a local dashboard over `.evo` artifacts:
+
+```bash
+evo gui --config examples/abc/evo.yaml --host 127.0.0.1 --port 8765
+```
+
+The GUI is read-only. It displays workflow state, history, events, run documents, roadmap, and code-memory index.
