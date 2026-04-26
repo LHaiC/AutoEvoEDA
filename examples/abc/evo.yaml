@@ -66,3 +66,13 @@ pool:
 budget:
   max_cycles: 0
   max_candidates: 0
+
+agents:
+  planner:
+    session_id: planner-main
+  coder:
+    session_id: coder-main
+  reviewer:
+    session_id: reviewer-main
+  code_understanding:
+    session_id: understand-main

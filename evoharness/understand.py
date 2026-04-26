@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import re
 
+from evoharness.agent_state import read_agent_memory
 from evoharness.config import EvoConfig, load_config
 from evoharness.events import append_event
 from evoharness.reports import write_project_indexes
@@ -84,6 +85,7 @@ def run_understand(config_path: Path) -> None:
         module_links.append((prefix, name))
         _write(memory / "modules" / name, _module_doc(repo, prefix))
 
+    understanding_memory = read_agent_memory(repo, cfg.agents.code_understanding.session_id)
     _write(
         memory / "index.md",
         "\n".join(
@@ -104,6 +106,10 @@ def run_understand(config_path: Path) -> None:
                 "",
                 "- `architecture.md`",
                 "- `build_system.md`",
+                "",
+                "## Understanding Agent Memory",
+                "",
+                understanding_memory or "No framework-level understanding agent memory yet.",
                 "",
             ]
         ),

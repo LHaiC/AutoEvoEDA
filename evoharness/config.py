@@ -79,6 +79,19 @@ class RulebaseConfig:
 
 
 @dataclass(frozen=True)
+class AgentRoleConfig:
+    session_id: str
+
+
+@dataclass(frozen=True)
+class AgentsConfig:
+    planner: AgentRoleConfig
+    coder: AgentRoleConfig
+    reviewer: AgentRoleConfig
+    code_understanding: AgentRoleConfig
+
+
+@dataclass(frozen=True)
 class PoolConfig:
     enabled: bool
     size: int
@@ -104,6 +117,7 @@ class EvoConfig:
     rulebase: RulebaseConfig
     pool: PoolConfig
     budget: BudgetConfig
+    agents: AgentsConfig
 
 
 def _section(data: dict[str, Any], name: str) -> dict[str, Any]:
@@ -141,6 +155,13 @@ def load_config(path: Path) -> EvoConfig:
     rulebase = {"path": ".evo/memory/rulebase.md", **_optional_section(data, "rulebase")}
     pool = {"enabled": False, "size": 1, **_optional_section(data, "pool")}
     budget = {"max_cycles": 0, "max_candidates": 0, **_optional_section(data, "budget")}
+    agents_data = _optional_section(data, "agents")
+    agents = {
+        "planner": {"session_id": "planner-main", **agents_data.get("planner", {})},
+        "coder": {"session_id": "coder-main", **agents_data.get("coder", {})},
+        "reviewer": {"session_id": "reviewer-main", **agents_data.get("reviewer", {})},
+        "code_understanding": {"session_id": "understand-main", **agents_data.get("code_understanding", {})},
+    }
 
     return EvoConfig(
         project=ProjectConfig(**_section(data, "project")),
@@ -155,4 +176,10 @@ def load_config(path: Path) -> EvoConfig:
         rulebase=RulebaseConfig(**rulebase),
         pool=PoolConfig(**pool),
         budget=BudgetConfig(**budget),
+        agents=AgentsConfig(
+            planner=AgentRoleConfig(**agents["planner"]),
+            coder=AgentRoleConfig(**agents["coder"]),
+            reviewer=AgentRoleConfig(**agents["reviewer"]),
+            code_understanding=AgentRoleConfig(**agents["code_understanding"]),
+        ),
     )

@@ -113,3 +113,30 @@ evo gui --config examples/abc/evo.yaml --host 127.0.0.1 --port 8765
 ```
 
 The GUI is read-only. It displays workflow state, history, events, run documents, roadmap, and code-memory index.
+
+## Agent Session Registry
+
+`evo-harness` keeps framework-level agent state even when the underlying Codex CLI cannot reliably resume externally supplied sessions:
+
+```text
+.evo/agents/<agent_id>/memory.md
+.evo/agents/<agent_id>/transcript.jsonl
+.evo/agents/<agent_id>/last_prompt.md
+.evo/agents/<agent_id>/last_response.md
+```
+
+Configure stable role ids in `evo.yaml`:
+
+```yaml
+agents:
+  planner:
+    session_id: planner-main
+  coder:
+    session_id: coder-main
+  reviewer:
+    session_id: reviewer-main
+  code_understanding:
+    session_id: understand-main
+```
+
+Role memory is injected into future prompts as a stable framework-level context path for long-running runs.

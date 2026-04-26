@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 import json
 
+from evoharness.agent_state import read_agent_memory
 from evoharness.config import EvoConfig
 from evoharness.session import recent_inbox
 
@@ -66,6 +67,15 @@ def render_prompt(base_prompt: str, repo: Path, cfg: EvoConfig) -> str:
         code_index = _read_if_present(repo / ".evo" / "memory" / "code" / "index.md")
         if code_index:
             sections.extend(["", "## Code understanding index", code_index])
+
+        for title, agent_id in [
+            ("Planner agent memory", cfg.agents.planner.session_id),
+            ("Coder agent memory", cfg.agents.coder.session_id),
+            ("Reviewer agent memory", cfg.agents.reviewer.session_id),
+        ]:
+            agent_memory = read_agent_memory(repo, agent_id)
+            if agent_memory:
+                sections.extend(["", f"## {title}", agent_memory])
 
         sections.extend(
             [

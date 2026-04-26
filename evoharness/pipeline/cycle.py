@@ -4,6 +4,7 @@ from dataclasses import asdict
 from pathlib import Path
 import json
 
+from evoharness.agent_state import write_agent_exchange
 from evoharness.agents.codex import CodexBackend
 from evoharness.config import EvoConfig, load_config
 from evoharness.events import append_event, run_dir, run_id
@@ -137,7 +138,8 @@ def run_one_cycle(
     agent_result = agent.run(prompt=prompt, cwd=candidate.path, timeout_s=cfg.agent.timeout_s)
     _write_text(cycle_dir / "codex.stdout", agent_result.stdout)
     _write_text(cycle_dir / "codex.stderr", agent_result.stderr)
-    _event(repo, run_id_value, "agent_finished", candidate, {"ok": agent_result.ok})
+    write_agent_exchange(repo, cfg.agents.coder.session_id, prompt, agent_result.stdout, agent_result.stderr, agent_result.ok)
+    _event(repo, run_id_value, "agent_finished", candidate, {"agent_id": cfg.agents.coder.session_id, "ok": agent_result.ok})
     if not agent_result.ok:
         return _record_decision(repo, run_id_value, candidate, "reject", "agent_failed", None, cfg)
 
@@ -153,10 +155,12 @@ def run_one_cycle(
     repair_attempt = 0
     while not passed and cfg.repair.enabled and failed_result and repair_attempt < cfg.repair.max_attempts:
         repair_attempt += 1
-        repair = agent.run(_repair_prompt(repo, cfg, reason, failed_result), candidate.path, cfg.agent.timeout_s)
+        repair_prompt = _repair_prompt(repo, cfg, reason, failed_result)
+        repair = agent.run(repair_prompt, candidate.path, cfg.agent.timeout_s)
         _write_text(cycle_dir / f"repair-{repair_attempt}.stdout", repair.stdout)
         _write_text(cycle_dir / f"repair-{repair_attempt}.stderr", repair.stderr)
-        _event(repo, run_id_value, "agent_finished", candidate, {"repair_attempt": repair_attempt, "ok": repair.ok})
+        write_agent_exchange(repo, cfg.agents.coder.session_id, repair_prompt, repair.stdout, repair.stderr, repair.ok)
+        _event(repo, run_id_value, "agent_finished", candidate, {"agent_id": cfg.agents.coder.session_id, "repair_attempt": repair_attempt, "ok": repair.ok})
         if not repair.ok:
             return _record_decision(repo, run_id_value, candidate, "reject", "repair_agent_failed", guard, cfg)
         guard = _check_guard(candidate, cfg, cycle_dir)
