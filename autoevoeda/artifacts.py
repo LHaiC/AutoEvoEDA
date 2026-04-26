@@ -5,6 +5,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 import json
+import os
+import shutil
 import subprocess
 
 from autoevoeda.config import EvoConfig, ResultFilesConfig, load_config
@@ -180,8 +182,9 @@ class CommandResult:
     stderr: str
 
 
-def run_cmd(name: str, cmd: str, cwd: Path) -> CommandResult:
-    proc = subprocess.run(cmd, cwd=cwd, shell=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+def run_cmd(name: str, cmd: str, cwd: Path, env: dict[str, str] | None = None) -> CommandResult:
+    merged_env = {**os.environ, **(env or {})}
+    proc = subprocess.run(cmd, cwd=cwd, env=merged_env, shell=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     return CommandResult(name, proc.returncode == 0, proc.returncode, proc.stdout, proc.stderr)
 
 
@@ -229,6 +232,7 @@ def _write(path: Path, text: str) -> None:
 
 
 def write_context_doc(repo: Path, value: str, config_path: Path, cfg: EvoConfig, candidate: Candidate) -> None:
+    repo_lines = [f"- `{item.name}`: `{item.branch}` at `{item.path}`" for item in candidate.repos]
     _write(
         run_dir(repo, value) / "00_context.md",
         "\n".join(
@@ -239,6 +243,9 @@ def write_context_doc(repo: Path, value: str, config_path: Path, cfg: EvoConfig,
                 f"- Branch: `{candidate.branch}`",
                 f"- Candidate worktree: `{candidate.path}`",
                 f"- Champion branch: `{cfg.project.champion_branch}`",
+                "",
+                "## Candidate repos",
+                *(repo_lines or ["- single repository candidate"]),
                 "",
                 "## Allowed paths",
                 *[f"- {path}" for path in cfg.guards.allowed_paths],
@@ -255,8 +262,28 @@ def write_propose_doc(repo: Path, value: str, prompt: str) -> None:
     _write(run_dir(repo, value) / "01_propose.md", "# Proposal Prompt\n\n```text\n" + prompt + "\n```\n")
 
 
+def _candidate_diff(candidate: Candidate) -> str:
+    if not candidate.repos:
+        return git(["diff"], cwd=candidate.path)
+    parts = []
+    for item in candidate.repos:
+        diff = git(["diff"], cwd=item.path)
+        if diff:
+            parts.extend([f"# repo: {item.name}", diff])
+    return "\n".join(parts)
+
+
+def _candidate_changed_files(candidate: Candidate) -> list[str]:
+    if not candidate.repos:
+        return changed_files(candidate.path)
+    rows = []
+    for item in candidate.repos:
+        rows.extend(f"{item.name}/{path}" for path in changed_files(item.path))
+    return rows
+
+
 def write_implement_doc(repo: Path, value: str, candidate: Candidate, guard: GuardResult) -> None:
-    _write(run_dir(repo, value) / "patch.diff", git(["diff"], cwd=candidate.path) + "\n")
+    _write(run_dir(repo, value) / "patch.diff", _candidate_diff(candidate) + "\n")
     _write(
         run_dir(repo, value) / "02_implement.md",
         "\n".join(
@@ -269,7 +296,7 @@ def write_implement_doc(repo: Path, value: str, candidate: Candidate, guard: Gua
                 f"- Patch: `patch.diff`",
                 "",
                 "## Files",
-                *[f"- `{path}`" for path in changed_files(candidate.path)],
+                *[f"- `{path}`" for path in _candidate_changed_files(candidate)],
                 "",
             ]
         ),
@@ -562,27 +589,44 @@ def _find_cycle_record(records: list[dict[str, Any]], cycle: int, candidate_inde
 def promote_cycle(config_path: Path, cycle: int, candidate_index: int = 1) -> None:
     cfg = load_config(config_path)
     repo = project_repo(config_path)
-    if cfg.promotion.require_clean_champion and git(["status", "--porcelain", "--untracked-files=no"], cwd=repo):
-        raise ValueError("project repo must be clean before promotion")
     record = _find_cycle_record(read_history(repo), cycle, candidate_index)
     if record["decision"] not in {"accept", "keep"}:
         raise ValueError(f"cycle {cycle} cannot be promoted from decision: {record['decision']}")
 
+    repo_records = record.get("candidate_repos") or {}
+    if repo_records:
+        promoted = {}
+        for name, item in repo_records.items():
+            source = Path(str(item["source"]))
+            if cfg.promotion.require_clean_champion and git(["status", "--porcelain", "--untracked-files=no"], cwd=source):
+                raise ValueError(f"source repo must be clean before promotion: {name}")
+            branch = str(item["branch"])
+            champion = str(item["champion_branch"])
+            git(["rev-parse", "--verify", branch], cwd=source)
+            git(["checkout", champion], cwd=source)
+            git(["merge", "--ff-only", branch], cwd=source)
+            promoted[name] = {"branch": branch, "champion_branch": champion}
+        promote_record = {"event": "promote", "cycle": cycle, "candidate_index": candidate_index, "repos": promoted, "decision": "promote", "reason": "explicit_promote"}
+        append_history(repo, promote_record)
+        append_event(repo, record.get("run_id", run_id(cycle, candidate_index, 1)), "promote", cycle, candidate_index, record["branch"], promote_record)
+        return
+
+    if cfg.promotion.require_clean_champion and git(["status", "--porcelain", "--untracked-files=no"], cwd=repo):
+        raise ValueError("project repo must be clean before promotion")
     branch = record["branch"]
     git(["rev-parse", "--verify", branch], cwd=repo)
     git(["checkout", cfg.project.champion_branch], cwd=repo)
     git(["merge", "--ff-only", branch], cwd=repo)
-    promote_record = {
-        "event": "promote",
-        "cycle": cycle,
-        "candidate_index": candidate_index,
-        "branch": branch,
-        "champion_branch": cfg.project.champion_branch,
-        "decision": "promote",
-        "reason": "explicit_promote",
-    }
+    promote_record = {"event": "promote", "cycle": cycle, "candidate_index": candidate_index, "branch": branch, "champion_branch": cfg.project.champion_branch, "decision": "promote", "reason": "explicit_promote"}
     append_history(repo, promote_record)
     append_event(repo, record.get("run_id", run_id(cycle, candidate_index, 1)), "promote", cycle, candidate_index, branch, promote_record)
+
+
+def _record_dirty(record: dict[str, Any], path: Path) -> bool:
+    repos = record.get("candidate_repos") or {}
+    if repos:
+        return any(git(["status", "--porcelain"], cwd=Path(str(item["path"]))) for item in repos.values() if Path(str(item["path"])).exists())
+    return bool(git(["status", "--porcelain"], cwd=path)) if path.exists() else False
 
 
 def list_worktrees(config_path: Path) -> list[dict[str, Any]]:
@@ -598,7 +642,7 @@ def list_worktrees(config_path: Path) -> list[dict[str, Any]]:
                 "decision": record.get("decision"),
                 "path": str(path),
                 "exists": path.exists(),
-                "dirty": bool(git(["status", "--porcelain"], cwd=path)) if path.exists() else False,
+                "dirty": _record_dirty(record, path),
             }
         )
     return rows
@@ -627,10 +671,17 @@ def cleanup_worktrees(
             continue
         if cutoff and datetime.fromtimestamp(path.stat().st_mtime, timezone.utc) > cutoff:
             continue
-        if git(["status", "--porcelain"], cwd=path) and not force:
+        if _record_dirty(record, path) and not force:
             continue
-        args = ["worktree", "remove", str(path)]
-        git(args[:2] + ["--force"] + args[2:] if force else args, cwd=repo)
+        repos = record.get("candidate_repos") or {}
+        if repos:
+            for info in repos.values():
+                args = ["worktree", "remove", str(info["path"])]
+                git(args[:2] + ["--force"] + args[2:] if force else args, cwd=Path(str(info["source"])))
+            shutil.rmtree(path, ignore_errors=True)
+        else:
+            args = ["worktree", "remove", str(path)]
+            git(args[:2] + ["--force"] + args[2:] if force else args, cwd=repo)
         item = {"cycle": record.get("cycle"), "candidate_index": record.get("candidate_index", 1), "path": str(path)}
         removed.append(item)
         append_event(repo, record.get("run_id", "worktree"), "worktree_removed", 0, 0, "", item)

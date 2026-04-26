@@ -34,8 +34,32 @@ from autoevoeda.artifacts import (
 from autoevoeda.config import DomainAgentConfig, EvoConfig, load_config
 from autoevoeda.human import review_candidate
 from autoevoeda.memory import append_lesson, render_prompt, render_repair_prompt
-from autoevoeda.workspace.git import Candidate, commit_candidate, create_candidate_worktree, git
-from autoevoeda.workspace.guard import GuardResult, check_patch_scope
+from autoevoeda.workspace.git import Candidate, commit_candidate, create_candidate_workspace, create_candidate_worktree, git
+from autoevoeda.workspace.guard import GuardResult, check_candidate_scope
+
+
+def _pipeline_env(repo: Path, candidate: Candidate) -> dict[str, str]:
+    return {
+        "AUTOEVO_ADAPTER_ROOT": str(repo),
+        "AUTOEVO_CANDIDATE_ROOT": str(candidate.path),
+    }
+
+
+def _candidate_head(candidate: Candidate) -> str:
+    if candidate.repos:
+        return ""
+    return git(["rev-parse", "HEAD"], cwd=candidate.path)
+
+
+def _candidate_diff(candidate: Candidate) -> str:
+    if not candidate.repos:
+        return git(["diff"], cwd=candidate.path)
+    parts = []
+    for repo in candidate.repos:
+        diff = git(["diff"], cwd=repo.path)
+        if diff:
+            parts.extend([f"# repo: {repo.name}", diff])
+    return "\n".join(parts)
 
 
 def _write_text(path: Path, text: str) -> None:
@@ -66,6 +90,7 @@ def _record_decision(
         "run_id": run_id_value,
         "candidate": str(candidate.path),
         "branch": candidate.branch,
+        "candidate_repos": {item.name: {"source": str(item.source), "path": str(item.path), "branch": item.branch, "champion_branch": item.champion_branch} for item in candidate.repos},
         "decision": decision,
         "reason": reason,
         "changed_files": guard.changed_files if guard else 0,
@@ -98,8 +123,9 @@ def _checkpoint(repo: Path, run_id_value: str, phase: str, candidate: Candidate)
 def _check_guard(candidate: Candidate, cfg: EvoConfig, cycle_dir: Path, domain_agent: DomainAgentConfig | None = None) -> GuardResult:
     allowed_paths = domain_agent.allowed_paths if domain_agent else cfg.guards.allowed_paths
     forbidden_paths = [*cfg.guards.forbidden_paths, *(domain_agent.forbidden_paths if domain_agent else [])]
-    guard = check_patch_scope(
-        repo=candidate.path,
+    guard = check_candidate_scope(
+        candidate=candidate,
+        workspace=cfg.workspace,
         allowed_paths=allowed_paths,
         forbidden_paths=forbidden_paths,
         max_changed_files=cfg.guards.max_changed_files,
@@ -118,7 +144,7 @@ def _run_pipeline(candidate: Candidate, cfg: EvoConfig, cycle_dir: Path, repo: P
         ("perf", cfg.pipeline.perf),
         ("reward", cfg.pipeline.reward),
     ]:
-        result = run_cmd(name=name, cmd=cmd, cwd=candidate.path)
+        result = run_cmd(name=name, cmd=cmd, cwd=candidate.path, env=_pipeline_env(repo, candidate))
         _checkpoint(repo, run_id_value, f"{name}_finished", candidate)
         results.append(result)
         _write_command_result(cycle_dir, result)
@@ -209,7 +235,8 @@ def _write_reproducibility(cycle_dir: Path, config_path: Path, repo: Path, candi
         "champion_branch": cfg.project.champion_branch,
         "project_head": git(["rev-parse", "HEAD"], cwd=repo),
         "candidate_branch": candidate.branch,
-        "candidate_head": git(["rev-parse", "HEAD"], cwd=candidate.path),
+        "candidate_head": _candidate_head(candidate),
+        "candidate_repos": {repo.name: {"branch": repo.branch, "head": git(["rev-parse", "HEAD"], cwd=repo.path)} for repo in candidate.repos},
     }
     _write_text(cycle_dir / "reproducibility.json", json.dumps(data, indent=2, sort_keys=True) + "\n")
 
@@ -224,15 +251,25 @@ def run_one_cycle(
 ) -> dict[str, object]:
     repo = (config_path.parent / cfg.project.repo).resolve()
     run_id_value = run_id(cycle, candidate_index, pool_size)
-    candidate = create_candidate_worktree(
-        repo=repo,
-        champion_branch=cfg.project.champion_branch,
-        worktree_root=(config_path.parent / cfg.workspace.worktree_root).resolve(),
-        project_name=cfg.project.name,
-        cycle=cycle,
-        candidate_index=candidate_index,
-        pool_size=pool_size,
-    )
+    if cfg.workspace.mode == "multi_repo":
+        candidate = create_candidate_workspace(
+            adapter_repo=repo,
+            cfg_workspace=cfg.workspace,
+            project_name=cfg.project.name,
+            cycle=cycle,
+            candidate_index=candidate_index,
+            pool_size=pool_size,
+        )
+    else:
+        candidate = create_candidate_worktree(
+            repo=repo,
+            champion_branch=cfg.project.champion_branch,
+            worktree_root=(config_path.parent / cfg.workspace.worktree_root).resolve(),
+            project_name=cfg.project.name,
+            cycle=cycle,
+            candidate_index=candidate_index,
+            pool_size=pool_size,
+        )
     cycle_dir = run_dir(repo, run_id_value)
     cycle_dir.mkdir(parents=True, exist_ok=True)
     _checkpoint(repo, run_id_value, "candidate_created", candidate)
@@ -274,6 +311,11 @@ def run_one_cycle(
             prompt += "\n# Domain Agent Memory\n" + agent_memory + "\n"
         prompt += "Before finishing, include these exact response fields:\n"
         prompt += "hypothesis:\ntarget_files:\nexpected_metric_impact:\nrollback_risk:\n"
+    if cfg.workspace.mode == "multi_repo":
+        prompt += "\n# Candidate Workspace\n"
+        prompt += f"AUTOEVO_ADAPTER_ROOT={repo}\n"
+        prompt += f"AUTOEVO_CANDIDATE_ROOT={candidate.path}\n"
+        prompt += "Repos:\n" + "\n".join(f"- {item.name}: {item.path}" for item in candidate.repos) + "\n"
     if planner_notes:
         prompt += "\n# Planner Notes\n" + planner_notes + "\n"
     write_propose_doc(repo, run_id_value, prompt)
@@ -303,7 +345,7 @@ def run_one_cycle(
 
     if cfg.multi_agent.reviewer and cfg.roles.reviewer_prompt:
         review_prompt = _role_prompt(repo, cfg, cfg.roles.reviewer_prompt)
-        review_prompt += "\n# Patch\n" + git(["diff"], cwd=candidate.path)
+        review_prompt += "\n# Patch\n" + _candidate_diff(candidate)
         review = run_codex_role(repo, cfg.agents.reviewer, agent, review_prompt, candidate.path, cfg.agent.timeout_s)
         _checkpoint(repo, run_id_value, "reviewer_finished", candidate)
         _write_text(cycle_dir / "reviewer.stdout", review.stdout)
@@ -313,7 +355,7 @@ def run_one_cycle(
         if not review.ok:
             return _record_decision(repo, run_id_value, candidate, "reject", "reviewer_failed", guard, cfg, agent=agent_name)
 
-    commit_candidate(candidate.path, cycle)
+    commit_candidate(candidate, cycle)
     _checkpoint(repo, run_id_value, "committed", candidate)
     _write_reproducibility(cycle_dir, config_path, repo, candidate, cfg)
     passed, reason, failed_result, _results = _run_pipeline(candidate, cfg, cycle_dir, repo, run_id_value)
@@ -336,7 +378,7 @@ def run_one_cycle(
         _event(repo, run_id_value, "guard_finished", candidate, asdict(guard))
         if not guard.ok:
             return _record_decision(repo, run_id_value, candidate, "reject", f"guard_failed:{guard.reason}", guard, cfg, agent=agent_name)
-        commit_candidate(candidate.path, cycle)
+        commit_candidate(candidate, cycle)
         _checkpoint(repo, run_id_value, f"repair_{repair_attempt}_committed", candidate)
         _write_reproducibility(cycle_dir, config_path, repo, candidate, cfg)
         passed, reason, failed_result, _results = _run_pipeline(candidate, cfg, cycle_dir, repo, run_id_value)

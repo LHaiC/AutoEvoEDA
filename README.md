@@ -14,7 +14,7 @@ The harness manages worktrees, guards, logs, memory, and accept/reject history.
 
 What the framework provides:
 
-- Candidate worktrees and candidate branches.
+- Candidate worktrees and candidate branches, including optional multi-repo workspaces.
 - Patch scope guards with allowed/forbidden paths.
 - Script-based gates for build, regression, compare, performance, and reward.
 - Run artifacts under `.evo/runs/<run_id>/`.
@@ -36,13 +36,17 @@ Status: alpha. The framework commands and example config have basic local valida
 
 ## 2. How To Run
 
-Recommended: ask Codex to use the repo-level Skill when adapting a project, installing AutoEvoEDA, or preparing a run:
+### Recommended:
+
+ask Codex to use the repo-level Skill when adapting a project, installing AutoEvoEDA, or preparing a run:
 
 ```text
 Use $autoevoeda-adapter to create or update an AutoEvoEDA adapter for this project, then show me the install and run commands.
 ```
 
-The Skill explains the expected workspace layout, `evo.yaml`, adapter scripts, memory files, and `evo` commands.
+The Skill explains the expected workspace layout, `evo.yaml`, adapter scripts, memory files, single-repo or multi-repo worktrees, and `evo` commands.
+
+### Manual:
 
 Install locally from this repository:
 
@@ -50,10 +54,11 @@ Install locally from this repository:
 pip install -e .
 ```
 
-Validate the example adapter config:
+Validate the example adapter configs:
 
 ```bash
 evo config validate --config examples/abc/evo.yaml
+evo config validate --config examples/multi_repo/evo.yaml
 ```
 
 Seed code-understanding memory before long runs:

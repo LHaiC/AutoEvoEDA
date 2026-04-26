@@ -1,0 +1,56 @@
+schema_version: "1.0"
+
+project:
+  name: multi.logic
+  repo: .
+
+agent:
+  prompt_file: prompts/coder.md
+  timeout_s: 3600
+  sandbox: workspace-write
+
+workspace:
+  mode: multi_repo
+  source_root: ../source-workspace
+  worktree_root: ../.evo-worktrees
+  repos:
+    - name: flow
+      path: flow
+      champion_branch: main
+      candidate_branch_prefix: evo
+      allowed_paths:
+        - src/
+      forbidden_paths:
+        - golden/
+    - name: mapper
+      path: mapper
+      champion_branch: main
+      allowed_paths:
+        - src/
+    - name: logic
+      path: logic
+      champion_branch: main
+      allowed_paths:
+        - src/
+  materialize:
+    copy: []
+    symlink: []
+
+guards:
+  max_changed_files: 8
+  max_changed_lines: 600
+  allowed_paths:
+    - flow/src/
+    - mapper/src/
+    - logic/src/
+  forbidden_paths:
+    - scripts/
+    - results/
+    - golden/
+
+pipeline:
+  build: bash "$AUTOEVO_ADAPTER_ROOT/scripts/build.sh"
+  regression: bash "$AUTOEVO_ADAPTER_ROOT/scripts/run_regression.sh"
+  compare_regression: python "$AUTOEVO_ADAPTER_ROOT/scripts/compare_regression.py"
+  perf: bash "$AUTOEVO_ADAPTER_ROOT/scripts/run_perf.sh"
+  reward: python "$AUTOEVO_ADAPTER_ROOT/scripts/reward.py"

@@ -16,6 +16,7 @@ agent:
   sandbox: workspace-write
 
 workspace:
+  mode: single_repo
   worktree_root: ../.evo-worktrees
 
 guards:
@@ -98,6 +99,10 @@ agents:
   code_understanding:
     session_id: understand-main
 ```
+
+## Multi-Repo Workspaces
+
+For sibling git repositories, use `workspace.mode: multi_repo`; see `multi-repo-workspace.md`. In that mode, `workspace.repos[*].allowed_paths` are local to each child repo and `guards.allowed_paths` should use candidate-root paths such as `mapper/src/`.
 
 ## Domain Agents
 

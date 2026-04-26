@@ -20,6 +20,7 @@ If the task edits the AutoEvoEDA framework itself, read `references/project-inte
 
 Identify concrete project facts before writing config:
 
+- whether the project is a single git repo or a multi-repo workspace
 - source paths that candidate agents may edit
 - immutable evaluator assets, golden data, benchmark definitions, and CI files
 - build command, regression/equivalence command, performance/QoR command, and reward rule
@@ -41,7 +42,7 @@ Optional domain agents get one prompt each, for example `prompts/mapper.md`.
 
 ## 3. Write evo.yaml
 
-Read `references/evo-yaml.md`. Keep values concrete and project-owned:
+Read `references/evo-yaml.md`. For sibling-repo workspaces, also read `references/multi-repo-workspace.md`. Keep values concrete and project-owned:
 
 - `guards.allowed_paths` contains implementation scopes only.
 - `guards.forbidden_paths` includes evaluator scripts, config, generated results, benchmark/golden assets, and CI.

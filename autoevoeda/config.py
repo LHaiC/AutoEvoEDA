@@ -22,8 +22,28 @@ class AgentConfig:
 
 
 @dataclass(frozen=True)
+class WorkspaceRepoConfig:
+    name: str
+    path: str
+    champion_branch: str
+    candidate_branch_prefix: str
+    allowed_paths: list[str]
+    forbidden_paths: list[str]
+
+
+@dataclass(frozen=True)
+class WorkspaceMaterializeConfig:
+    copy: list[str]
+    symlink: list[str]
+
+
+@dataclass(frozen=True)
 class WorkspaceConfig:
     worktree_root: str
+    mode: str
+    source_root: str
+    repos: list[WorkspaceRepoConfig]
+    materialize: WorkspaceMaterializeConfig
 
 
 @dataclass(frozen=True)
@@ -230,11 +250,49 @@ def _domain_agents(data: dict[str, Any]) -> list[DomainAgentConfig]:
     return agents
 
 
+def _workspace(data: dict[str, Any], project: dict[str, Any]) -> WorkspaceConfig:
+    raw = {"mode": "single_repo", "source_root": "", "repos": [], "materialize": {}, **_section(data, "workspace")}
+    materialize = raw.pop("materialize")
+    repos = raw.pop("repos")
+    if raw["mode"] not in {"single_repo", "multi_repo"}:
+        raise ValueError("workspace.mode must be single_repo or multi_repo")
+    if not isinstance(materialize, dict):
+        raise ValueError("workspace.materialize must be a mapping")
+    if not isinstance(repos, list):
+        raise ValueError("workspace.repos must be a list")
+    workspace_repos = []
+    for item in repos:
+        if not isinstance(item, dict):
+            raise ValueError("workspace.repos entries must be mappings")
+        name = str(item["name"])
+        workspace_repos.append(
+            WorkspaceRepoConfig(
+                name=name,
+                path=str(item.get("path", name)),
+                champion_branch=str(item.get("champion_branch", project.get("champion_branch", ""))),
+                candidate_branch_prefix=str(item.get("candidate_branch_prefix", "evo")),
+                allowed_paths=list(item["allowed_paths"]),
+                forbidden_paths=list(item.get("forbidden_paths", [])),
+            )
+        )
+    if raw["mode"] == "multi_repo" and not workspace_repos:
+        raise ValueError("workspace.repos is required when workspace.mode is multi_repo")
+    return WorkspaceConfig(
+        **raw,
+        repos=workspace_repos,
+        materialize=WorkspaceMaterializeConfig(
+            copy=list(materialize.get("copy", [])),
+            symlink=list(materialize.get("symlink", [])),
+        ),
+    )
+
+
 def load_config(path: Path) -> EvoConfig:
     data = yaml.safe_load(path.read_text())
     if not isinstance(data, dict):
         raise ValueError("config root must be a mapping")
 
+    project = {"champion_branch": "", **_section(data, "project")}
     agent = {"timeout_s": 3600, "sandbox": "workspace-write", **_section(data, "agent")}
     memory = {
         "enabled": False,
@@ -262,14 +320,17 @@ def load_config(path: Path) -> EvoConfig:
     }
     agents_data = _optional_section(data, "agents")
     domain_agents = _domain_agents(data)
+    workspace = _workspace(data, project)
+    if workspace.mode == "single_repo" and not project["champion_branch"]:
+        raise ValueError("project.champion_branch is required when workspace.mode is single_repo")
     if domain_agents and (not multi_agent["planner"] or not roles["planner_prompt"]):
         raise ValueError("domain_agents require multi_agent.planner and roles.planner_prompt")
 
     return EvoConfig(
         schema_version=str(data.get("schema_version", "1.0")),
-        project=ProjectConfig(**_section(data, "project")),
+        project=ProjectConfig(**project),
         agent=AgentConfig(**agent),
-        workspace=WorkspaceConfig(**_section(data, "workspace")),
+        workspace=workspace,
         guards=GuardConfig(**_section(data, "guards")),
         pipeline=PipelineConfig(**_section(data, "pipeline")),
         result_files=ResultFilesConfig(**result_files),

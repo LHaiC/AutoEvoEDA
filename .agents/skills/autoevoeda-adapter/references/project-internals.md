@@ -14,15 +14,15 @@ Read this before editing the AutoEvoEDA framework code. Keep framework changes s
 - `autoevoeda/daemon.py`: long-running loop, daemon lock, heartbeat, pause/resume checks, and consecutive-reject stop.
 - `autoevoeda/human.py`: terminal human checkpoint prompts.
 - `autoevoeda/gui.py`: local read/control dashboard over `.evo` files.
-- `autoevoeda/workspace/git.py`: git subprocess wrapper, worktree creation, changed-file accounting, candidate commits.
-- `autoevoeda/workspace/guard.py`: patch scope and suspicious-pattern guard.
+- `autoevoeda/workspace/git.py`: git subprocess wrapper, single-repo worktree creation, multi-repo candidate workspace creation, changed-file accounting, candidate commits.
+- `autoevoeda/workspace/guard.py`: single-repo and multi-repo patch scope plus suspicious-pattern guard.
 
 ## Main Data Flow
 
 ```text
 evo CLI
   -> load_config(evo.yaml)
-  -> create candidate worktree from champion branch
+  -> create single-repo worktree or multi-repo candidate workspace
   -> optional planner / domain-agent selection
   -> Codex edits candidate worktree
   -> patch guard checks allowed/forbidden paths and size

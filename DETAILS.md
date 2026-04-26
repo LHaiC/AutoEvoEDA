@@ -89,6 +89,36 @@ ABC build, CEC, benchmark, QoR, and reward scripts are adapter-owned. The framew
 
 Framework-level paper-alignment scaffolding is implemented for domain agents, per-agent guard scopes, planner-selected agents, structured proposal artifacts, cycle-0 bootstrap memory, reward-driven keep/reject decisions, rule proposals with safety checks, reproducibility metadata, and paper-fidelity reports. Full experimental reproduction still requires a real ABC adapter and benchmark environment.
 
+
+## Multi-Repo Workspaces
+
+AutoEvoEDA supports both single-repo and multi-repo candidate layouts. In multi-repo mode, the adapter/control repo stores `evo.yaml`, prompts, scripts, and `.evo/` state, while candidate workspaces contain one git worktree per child repository. This is for EDA workspaces that are not a monorepo but still need to build and benchmark as one directory tree.
+
+```yaml
+workspace:
+  mode: multi_repo
+  source_root: ../source-workspace
+  worktree_root: ../.evo-worktrees
+  repos:
+    - name: mapper
+      path: mapper
+      champion_branch: main
+      allowed_paths:
+        - src/
+  materialize:
+    copy: []
+    symlink: []
+
+guards:
+  allowed_paths:
+    - mapper/src/
+
+pipeline:
+  build: bash "$AUTOEVO_ADAPTER_ROOT/scripts/build.sh"
+```
+
+Pipeline commands run with `cwd=$AUTOEVO_CANDIDATE_ROOT` and receive `AUTOEVO_ADAPTER_ROOT` and `AUTOEVO_CANDIDATE_ROOT` in the environment. Promotion fast-forwards each changed child repo into its configured champion branch. See `examples/multi_repo/`.
+
 ## Long-Running Controls
 
 Enable memory in `evo.yaml` to inject project memory, recent lessons, rejected ideas, accepted patterns, and patch scope into the Codex prompt. Lessons are appended to `.evo/memory/lessons.jsonl` after each cycle.
