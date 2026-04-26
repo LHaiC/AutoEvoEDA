@@ -1,8 +1,8 @@
-# evo-harness
+# AutoEvoEDA
 
 ## 1. Basic Features
 
-`evo-harness` is a minimal local evolution harness for EDA projects, inspired by *Autonomous Evolution of EDA Tools: Multi-Agent Self-Evolved ABC* (arXiv:2604.15082v1). It is designed for Codex + GPT-style local coding agents.
+`AutoEvoEDA` (Autonomous Evolutive EDA) is a minimal local evolution harness for EDA projects, inspired by *Autonomous Evolution of EDA Tools: Multi-Agent Self-Evolved ABC* (arXiv:2604.15082v1). It is designed for Codex + GPT-style local coding agents.
 
 Core contract:
 
@@ -28,11 +28,21 @@ What each project provides:
 - adapter scripts under `scripts/`
 - project-specific correctness, QoR, performance, and reward logic
 
-`evo-harness` never trusts the agent to decide correctness or performance.
+`AutoEvoEDA` never trusts the agent to decide correctness or performance.
 
 For the full design, paper-alignment notes, agent model, and advanced commands, see `DETAILS.md`.
 
+Status: alpha. The framework commands and example config have basic local validation, but a real project adapter has not yet been end-to-end tested. Treat the example scripts as placeholders until you provide project-specific build, regression, performance, and reward scripts.
+
 ## 2. How To Run
+
+Recommended: ask Codex to use the repo-level Skill when adapting a project, installing AutoEvoEDA, or preparing a run:
+
+```text
+Use $autoevoeda-adapter to create or update an AutoEvoEDA adapter for this project, then show me the install and run commands.
+```
+
+The Skill explains the expected workspace layout, `evo.yaml`, adapter scripts, memory files, and `evo` commands.
 
 Install locally from this repository:
 

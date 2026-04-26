@@ -5,9 +5,9 @@ import json
 import os
 import time
 
-from evoharness.artifacts import append_event, ensure_session, read_history, read_state, set_session_status, write_project_indexes
-from evoharness.config import EvoConfig, load_config
-from evoharness.pipeline.cycle import assert_no_interrupted_run, run_one_cycle
+from autoevoeda.artifacts import append_event, ensure_session, read_history, read_state, set_session_status, write_project_indexes
+from autoevoeda.config import EvoConfig, load_config
+from autoevoeda.pipeline.cycle import assert_no_interrupted_run, run_one_cycle
 
 
 def _repo(config_path: Path, cfg: EvoConfig) -> Path:

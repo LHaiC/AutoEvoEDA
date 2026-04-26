@@ -1,7 +1,7 @@
-# evo-harness Details
+# AutoEvoEDA Details
 
 
-Minimal local evolution harness for EDA projects, inspired by *Autonomous Evolution of EDA Tools: Multi-Agent Self-Evolved ABC* (arXiv:2604.15082v1). The design is intended for Codex + GPT-5.5 high-reasoning style local coding agents.
+AutoEvoEDA (Autonomous Evolutive EDA) is a minimal local evolution harness for EDA projects, inspired by *Autonomous Evolution of EDA Tools: Multi-Agent Self-Evolved ABC* (arXiv:2604.15082v1). The design is intended for Codex + GPT-5.5 high-reasoning style local coding agents.
 
 ```text
 Codex proposes patches.
@@ -22,7 +22,7 @@ A project provides `evo.yaml`, a prompt, and scripts for build, regression, perf
 
 Use `schema_version: "1.0"` for the stable local schema.
 
-`evo-harness` never trusts the agent to decide correctness or performance.
+`AutoEvoEDA` never trusts the agent to decide correctness or performance.
 
 Project scripts may also write structured evaluator result files. The harness records any existing JSON object files in each cycle summary and history:
 
@@ -38,7 +38,7 @@ These files are adapter-owned. For ABC-style work, `correctness.json` can summar
 
 ## Paper Fidelity Status
 
-`evo-harness` implements the reusable outer loop from arXiv:2604.15082v1: Codex invocation, candidate worktrees, patch guards, event logs, run directories, phase documents, human comments, memory injection, local GUI inspection/control, rule proposals, and explicit promotion.
+`AutoEvoEDA` implements the reusable outer loop from arXiv:2604.15082v1: Codex invocation, candidate worktrees, patch guards, event logs, run directories, phase documents, human comments, memory injection, local GUI inspection/control, rule proposals, and explicit promotion.
 
 It does not yet reproduce the full paper system. The paper is an ABC-specific multi-agent self-evolution system with cycle-0 knowledge bootstrapping, a global planning agent, three domain-specialized coding agents, formal equivalence checking, large-scale QoR evaluation, and a self-evolving rulebase. This repository is currently the framework shell that an ABC adapter can use to build toward that system.
 
@@ -81,7 +81,7 @@ code_understanding:
   Optional. Runs through evo understand --agent to enrich deterministic code memory.
 ```
 
-This differs from the paper. The paper uses a global planning agent plus three ABC domain coding agents: Flow Agent, Mapper Agent, and Logic Minimization Agent. Those agents operate on distinct ABC subsystems and are coordinated through a shared evolving rulebase and a unified correctness/QoR pipeline. `evo-harness` now supports configurable domain-agent identities, but it does not ship ABC-specific Flow/Mapper/Logic prompts, scopes, or adapter scripts.
+This differs from the paper. The paper uses a global planning agent plus three ABC domain coding agents: Flow Agent, Mapper Agent, and Logic Minimization Agent. Those agents operate on distinct ABC subsystems and are coordinated through a shared evolving rulebase and a unified correctness/QoR pipeline. `AutoEvoEDA` now supports configurable domain-agent identities, but it does not ship ABC-specific Flow/Mapper/Logic prompts, scopes, or adapter scripts.
 
 ## Paper-Fidelity Scope
 
@@ -263,7 +263,7 @@ The GUI displays workflow state, history, events, run documents, roadmap, and co
 
 ## Agent Session Registry
 
-`evo-harness` keeps framework-level agent state even when the underlying Codex CLI cannot reliably resume externally supplied sessions:
+`AutoEvoEDA` keeps framework-level agent state even when the underlying Codex CLI cannot reliably resume externally supplied sessions:
 
 ```text
 .evo/agents/<agent_id>/memory.md

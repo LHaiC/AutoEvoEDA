@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import Any
 import json
 
-from evoharness.config import EvoConfig
-from evoharness.artifacts import read_agent_memory, recent_inbox
+from autoevoeda.config import EvoConfig
+from autoevoeda.artifacts import read_agent_memory, recent_inbox
 
 
 def _read_if_present(path: Path) -> str:
@@ -37,7 +37,7 @@ def render_prompt(base_prompt: str, repo: Path, cfg: EvoConfig) -> str:
     sections.extend(_role_section(repo, "Reviewer advisory guidance", cfg.roles.reviewer_prompt, base_prompt))
 
     if cfg.memory.enabled:
-        sections.extend(["", "# evo-harness context"])
+        sections.extend(["", "# AutoEvoEDA context"])
         for title, path in [
             ("Project memory", cfg.memory.project_memory),
             ("Rulebase", cfg.rulebase.path),

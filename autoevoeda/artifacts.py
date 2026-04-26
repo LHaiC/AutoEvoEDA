@@ -7,9 +7,9 @@ from typing import Any
 import json
 import subprocess
 
-from evoharness.config import EvoConfig, ResultFilesConfig, load_config
-from evoharness.workspace.git import Candidate, changed_files, git
-from evoharness.workspace.guard import GuardResult
+from autoevoeda.config import EvoConfig, ResultFilesConfig, load_config
+from autoevoeda.workspace.git import Candidate, changed_files, git
+from autoevoeda.workspace.guard import GuardResult
 
 
 def project_repo(config_path: Path) -> Path:
@@ -392,7 +392,7 @@ def write_project_indexes(repo: Path) -> None:
     evo = repo / ".evo"
     evo.mkdir(parents=True, exist_ok=True)
     records = [r for r in read_history(repo) if "branch" in r and r.get("event") != "promote"]
-    lines = ["# evo-harness Index", "", "## Recent Candidates", ""]
+    lines = ["# AutoEvoEDA Index", "", "## Recent Candidates", ""]
     lines.extend(f"- `{r.get('run_id', _cycle_dir_name(r))}`: `{r['decision']}` / `{r['reason']}` on `{r['branch']}`" for r in records[-20:])
     lines.extend(["", "## Files", "", "- `history.jsonl`", "- `events.jsonl`", "- `runs/`", "- `session/`", "- `memory/`", ""])
     (evo / "index.md").write_text("\n".join(lines))

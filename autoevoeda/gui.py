@@ -7,8 +7,8 @@ from typing import Any
 import json
 from urllib.parse import parse_qs
 
-from evoharness.config import load_config
-from evoharness.artifacts import add_session_comment, promote_cycle, set_session_status
+from autoevoeda.config import load_config
+from autoevoeda.artifacts import add_session_comment, promote_cycle, set_session_status
 
 
 def _repo(config_path: Path) -> Path:
@@ -68,7 +68,7 @@ def render_dashboard(repo: Path) -> str:
 <html>
 <head>
 <meta charset="utf-8">
-<title>evo-harness</title>
+<title>AutoEvoEDA</title>
 <style>
 body {{ font-family: ui-sans-serif, system-ui, sans-serif; margin: 24px; color: #1d252c; background: #f6f3ee; }}
 h1 {{ margin-bottom: 4px; }}
@@ -83,7 +83,7 @@ a {{ color: #0f5f8f; }}
 </style>
 </head>
 <body>
-<h1>evo-harness dashboard</h1>
+<h1>AutoEvoEDA dashboard</h1>
 <p>Local control view for <code>{escape(str(repo))}</code></p>
 <section><h2>Workflow</h2>{_workflow_graph()}</section>
 <section><h2>Controls</h2>
@@ -159,5 +159,5 @@ def serve_gui(config_path: Path, host: str, port: int) -> None:
             return
 
     server = ThreadingHTTPServer((host, port), Handler)
-    print(f"Serving evo-harness GUI at http://{host}:{port}")
+    print(f"Serving AutoEvoEDA GUI at http://{host}:{port}")
     server.serve_forever()

@@ -4,10 +4,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 import re
 
-from evoharness.agents.codex import CodexBackend, run_codex_role
-from evoharness.artifacts import append_event, read_agent_memory, write_agent_exchange, write_project_indexes
-from evoharness.config import EvoConfig, load_config
-from evoharness.workspace.git import git
+from autoevoeda.agents.codex import CodexBackend, run_codex_role
+from autoevoeda.artifacts import append_event, read_agent_memory, write_agent_exchange, write_project_indexes
+from autoevoeda.config import EvoConfig, load_config
+from autoevoeda.workspace.git import git
 
 
 def _safe_name(path: str) -> str:

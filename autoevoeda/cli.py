@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import argparse
 
-from evoharness.artifacts import (
+from autoevoeda.artifacts import (
     accept_rule,
     cleanup_worktrees,
     compare_cycle,
@@ -17,11 +17,11 @@ from evoharness.artifacts import (
     session_status,
     set_session_status,
 )
-from evoharness.config import load_config
-from evoharness.daemon import run_daemon
-from evoharness.gui import serve_gui
-from evoharness.pipeline.cycle import run_cycles
-from evoharness.understand import run_understand
+from autoevoeda.config import load_config
+from autoevoeda.daemon import run_daemon
+from autoevoeda.gui import serve_gui
+from autoevoeda.pipeline.cycle import run_cycles
+from autoevoeda.understand import run_understand
 
 
 def build_parser() -> argparse.ArgumentParser:

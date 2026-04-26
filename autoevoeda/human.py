@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from evoharness.workspace.git import Candidate
-from evoharness.workspace.guard import GuardResult
+from autoevoeda.workspace.git import Candidate
+from autoevoeda.workspace.guard import GuardResult
 
 
 @dataclass(frozen=True)

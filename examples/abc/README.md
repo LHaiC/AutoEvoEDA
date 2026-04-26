@@ -1,6 +1,6 @@
 # ABC Adapter Example
 
-This directory shows what an open-source project adapter should provide to `evo-harness`. ABC is used as the public example because its build, equivalence checking, and benchmark-evaluation shape matches the long-running EDA evolution loop described in `2604.15082v1`.
+This directory shows what an open-source project adapter should provide to `AutoEvoEDA`. ABC is used as the public example because its build, equivalence checking, and benchmark-evaluation shape matches the long-running EDA evolution loop described in `2604.15082v1`.
 
 The framework does not know ABC internals. ABC-specific behavior lives in this adapter:
 
@@ -31,7 +31,7 @@ pipeline commands
 structured evaluator result files
 ```
 
-Keep project-specific benchmark paths and commands here or inside scripts. Do not hard-code them in `evo-harness` Python code.
+Keep project-specific benchmark paths and commands here or inside scripts. Do not hard-code them in `AutoEvoEDA` Python code.
 
 ### `prompts/coder.md`
 
@@ -129,7 +129,7 @@ Keep these files machine-readable and separate from stdout logs. If a configured
 
 ## What Not To Put In The Framework
 
-Do not add ABC-specific logic to `evoharness/`:
+Do not add ABC-specific logic to `autoevoeda/`:
 
 ```text
 benchmark names

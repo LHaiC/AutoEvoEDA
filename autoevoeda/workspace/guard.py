@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from evoharness.workspace.git import changed_files, changed_line_count, git
+from autoevoeda.workspace.git import changed_files, changed_line_count, git
 
 
 @dataclass(frozen=True)

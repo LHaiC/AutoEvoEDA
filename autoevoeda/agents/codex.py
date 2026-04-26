@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 import subprocess
 
-from evoharness.artifacts import read_codex_session, write_codex_session_event
-from evoharness.config import AgentRoleConfig, DomainAgentConfig
+from autoevoeda.artifacts import read_codex_session, write_codex_session_event
+from autoevoeda.config import AgentRoleConfig, DomainAgentConfig
 
 
 @dataclass(frozen=True)

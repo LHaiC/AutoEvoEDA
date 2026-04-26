@@ -1,0 +1,6 @@
+interface:
+  display_name: "AutoEvoEDA Adapter"
+  short_description: "Create AutoEvoEDA project adapters"
+  default_prompt: "Use $autoevoeda-adapter to create or update an AutoEvoEDA project adapter layout and evo.yaml."
+policy:
+  allow_implicit_invocation: true

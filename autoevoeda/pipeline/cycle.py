@@ -4,8 +4,8 @@ from dataclasses import asdict
 from pathlib import Path
 import json
 
-from evoharness.agents.codex import CodexBackend, run_codex_role
-from evoharness.artifacts import (
+from autoevoeda.agents.codex import CodexBackend, run_codex_role
+from autoevoeda.artifacts import (
     EvaluatorSnapshot,
     CommandResult,
     active_run,
@@ -31,11 +31,11 @@ from evoharness.artifacts import (
     assert_not_paused,
     ensure_session,
 )
-from evoharness.config import DomainAgentConfig, EvoConfig, load_config
-from evoharness.human import review_candidate
-from evoharness.memory import append_lesson, render_prompt, render_repair_prompt
-from evoharness.workspace.git import Candidate, commit_candidate, create_candidate_worktree, git
-from evoharness.workspace.guard import GuardResult, check_patch_scope
+from autoevoeda.config import DomainAgentConfig, EvoConfig, load_config
+from autoevoeda.human import review_candidate
+from autoevoeda.memory import append_lesson, render_prompt, render_repair_prompt
+from autoevoeda.workspace.git import Candidate, commit_candidate, create_candidate_worktree, git
+from autoevoeda.workspace.guard import GuardResult, check_patch_scope
 
 
 def _write_text(path: Path, text: str) -> None:
