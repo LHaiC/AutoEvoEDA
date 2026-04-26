@@ -63,6 +63,10 @@ def render_prompt(base_prompt: str, repo: Path, cfg: EvoConfig) -> str:
         if roadmap:
             sections.extend(["", "## Evolution roadmap", roadmap])
 
+        code_index = _read_if_present(repo / ".evo" / "memory" / "code" / "index.md")
+        if code_index:
+            sections.extend(["", "## Code understanding index", code_index])
+
         sections.extend(
             [
                 "",

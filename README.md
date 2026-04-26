@@ -93,3 +93,13 @@ events.jsonl
 ```
 
 The repository-level event log is `.evo/events.jsonl`. Human review decisions can include a comment and next hint; those fields are recorded in history, events, and decision documents.
+
+## Code Understanding Memory
+
+Seed hierarchical code memory before long-running evolution:
+
+```bash
+evo understand --config examples/abc/evo.yaml
+```
+
+This writes deterministic memory under `.evo/memory/code/`, including module summaries for allowed paths and workflow notes for build, regression, benchmark, and reward commands. Later understanding agents can enrich these files.

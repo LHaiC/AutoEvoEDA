@@ -6,6 +6,7 @@ import argparse
 from evoharness.pipeline.cycle import run_cycles
 from evoharness.promote import promote_cycle
 from evoharness.session import add_session_comment, session_status, set_session_status
+from evoharness.understand import run_understand
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -23,6 +24,8 @@ def build_parser() -> argparse.ArgumentParser:
     session.add_argument("action", choices=["status", "comment", "pause", "resume"])
     session.add_argument("text", nargs="*")
     session.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
+    understand = subparsers.add_parser("understand", help="write deterministic code-understanding memory")
+    understand.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
     return parser
 
 
@@ -41,6 +44,8 @@ def main() -> None:
             print(set_session_status(args.config, "paused"))
         if args.action == "resume":
             print(set_session_status(args.config, "running"))
+    if args.command == "understand":
+        run_understand(args.config)
 
 
 if __name__ == "__main__":
