@@ -10,6 +10,13 @@ from evoharness.workspace.guard import GuardResult
 class HumanDecision:
     decision: str
     reason: str
+    comment: str
+    next_hint: str
+
+
+def _read_optional(label: str) -> str:
+    print(label)
+    return input("> ").strip()
 
 
 def review_candidate(candidate: Candidate, guard: GuardResult) -> HumanDecision:
@@ -19,12 +26,18 @@ def review_candidate(candidate: Candidate, guard: GuardResult) -> HumanDecision:
     print(f"Worktree: {candidate.path}")
     print(f"Changed files: {guard.changed_files}")
     print(f"Changed lines: {guard.changed_lines}")
-    print("Decision: [a] accept, [r] reject, [k] keep for later")
+    print("Decision: [a] accept, [r] reject, [k] keep, [d] redirect, [p] pause")
     answer = input("> ").strip().lower()
-    if answer == "a":
-        return HumanDecision("accept", "human_accepted_all_gates_passed")
-    if answer == "r":
-        return HumanDecision("reject", "human_rejected")
-    if answer == "k":
-        return HumanDecision("keep", "human_kept_for_later")
-    raise ValueError(f"invalid human review decision: {answer}")
+    choices = {
+        "a": ("accept", "human_accepted_all_gates_passed"),
+        "r": ("reject", "human_rejected"),
+        "k": ("keep", "human_kept_for_later"),
+        "d": ("redirect", "human_redirected"),
+        "p": ("pause", "human_paused"),
+    }
+    if answer not in choices:
+        raise ValueError(f"invalid human review decision: {answer}")
+    decision, reason = choices[answer]
+    comment = _read_optional("Optional comment, empty to skip:")
+    next_hint = _read_optional("Optional next hint, empty to skip:")
+    return HumanDecision(decision, reason, comment, next_hint)

@@ -1,6 +1,6 @@
 # evo-harness
 
-Minimal local evolution harness for EDA projects.
+Minimal local evolution harness for EDA projects, inspired by *Autonomous Evolution of EDA Tools: Multi-Agent Self-Evolved ABC* (arXiv:2604.15082v1). The design is intended for Codex + GPT-5.5 high-reasoning style local coding agents.
 
 ```text
 Codex proposes patches.
@@ -31,7 +31,7 @@ Use human review when accepted candidates should pause for manual steering:
 evo run --config examples/abc/evo.yaml --cycles 5 --human-review
 ```
 
-Human review can accept, reject, or keep an all-gates-passed candidate. It does not bypass build, regression, performance, reward, or patch guards.
+Human review can accept, reject, keep, redirect, or pause an all-gates-passed candidate. Every option can include an optional comment and next hint. It does not bypass build, regression, performance, reward, or patch guards.
 
 ## Explicit Promotion
 
@@ -77,3 +77,19 @@ budget:
 ```
 
 Each candidate still runs the same deterministic guards and project scripts.
+
+## Run Artifacts
+
+Each candidate writes an event stream and phase documents under `.evo/runs/<run_id>/`:
+
+```text
+00_context.md
+01_propose.md
+02_implement.md
+03_benchmark.md
+04_decision.md
+patch.diff
+events.jsonl
+```
+
+The repository-level event log is `.evo/events.jsonl`. Human review decisions can include a comment and next hint; those fields are recorded in history, events, and decision documents.

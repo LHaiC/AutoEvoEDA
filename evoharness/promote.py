@@ -5,6 +5,7 @@ from typing import Any
 import json
 
 from evoharness.config import load_config
+from evoharness.events import append_event, run_id
 from evoharness.state import append_history
 from evoharness.workspace.git import git
 
@@ -39,15 +40,14 @@ def promote_cycle(config_path: Path, cycle: int, candidate_index: int = 1) -> No
     git(["rev-parse", "--verify", branch], cwd=repo)
     git(["checkout", cfg.project.champion_branch], cwd=repo)
     git(["merge", "--ff-only", branch], cwd=repo)
-    append_history(
-        repo,
-        {
-            "event": "promote",
-            "cycle": cycle,
-            "candidate_index": candidate_index,
-            "branch": branch,
-            "champion_branch": cfg.project.champion_branch,
-            "decision": "promote",
-            "reason": "explicit_promote",
-        },
-    )
+    promote_record = {
+        "event": "promote",
+        "cycle": cycle,
+        "candidate_index": candidate_index,
+        "branch": branch,
+        "champion_branch": cfg.project.champion_branch,
+        "decision": "promote",
+        "reason": "explicit_promote",
+    }
+    append_history(repo, promote_record)
+    append_event(repo, record.get("run_id", run_id(cycle, candidate_index, 1)), "promote", cycle, candidate_index, branch, promote_record)

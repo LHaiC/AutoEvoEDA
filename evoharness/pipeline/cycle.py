@@ -6,8 +6,10 @@ import json
 
 from evoharness.agents.codex import CodexBackend
 from evoharness.config import EvoConfig, load_config
+from evoharness.events import append_event, run_dir, run_id
 from evoharness.human import review_candidate
 from evoharness.memory import append_lesson, render_prompt, render_repair_prompt
+from evoharness.phase_docs import write_benchmark_doc, write_context_doc, write_decision_doc, write_implement_doc, write_propose_doc
 from evoharness.pipeline.runner import CommandResult, run_cmd
 from evoharness.reports import write_cycle_summary
 from evoharness.state import append_history
@@ -20,33 +22,43 @@ def _write_text(path: Path, text: str) -> None:
     path.write_text(text)
 
 
-def _cycle_dir(repo: Path, cycle: int, candidate_index: int, pool_size: int) -> Path:
-    suffix = f"cycle-{cycle:03d}" if pool_size == 1 else f"cycle-{cycle:03d}-cand-{candidate_index:03d}"
-    return repo / ".evo" / suffix
+def _cycle_dir(repo: Path, run_id_value: str) -> Path:
+    return repo / ".evo" / run_id_value
+
+
+def _event(repo: Path, run_id_value: str, event_type: str, candidate: Candidate, payload: dict[str, object]) -> None:
+    append_event(repo, run_id_value, event_type, candidate.cycle, candidate.index, candidate.branch, payload)
 
 
 def _record_decision(
     repo: Path,
-    cycle: int,
+    run_id_value: str,
     candidate: Candidate,
     decision: str,
     reason: str,
     guard: GuardResult | None,
     cfg: EvoConfig,
+    human_comment: str = "",
+    next_hint: str = "",
 ) -> dict[str, object]:
     record = {
-        "cycle": cycle,
+        "cycle": candidate.cycle,
         "candidate_index": candidate.index,
+        "run_id": run_id_value,
         "candidate": str(candidate.path),
         "branch": candidate.branch,
         "decision": decision,
         "reason": reason,
         "changed_files": guard.changed_files if guard else 0,
         "changed_lines": guard.changed_lines if guard else 0,
+        "human_comment": human_comment,
+        "next_hint": next_hint,
     }
     append_history(repo, record)
     append_lesson(repo, cfg, record)
     write_cycle_summary(repo, record)
+    write_decision_doc(repo, run_id_value, record)
+    _event(repo, run_id_value, "decision_recorded", candidate, {"decision": decision, "reason": reason})
     return record
 
 
@@ -68,7 +80,8 @@ def _check_guard(candidate: Candidate, cfg: EvoConfig, cycle_dir: Path) -> Guard
     return guard
 
 
-def _run_pipeline(candidate: Candidate, cfg: EvoConfig, cycle_dir: Path) -> tuple[bool, str, CommandResult | None]:
+def _run_pipeline(candidate: Candidate, cfg: EvoConfig, cycle_dir: Path, repo: Path, run_id_value: str) -> tuple[bool, str, CommandResult | None, list[CommandResult]]:
+    results = []
     for name, cmd in [
         ("build", cfg.pipeline.build),
         ("regression", cfg.pipeline.regression),
@@ -77,10 +90,14 @@ def _run_pipeline(candidate: Candidate, cfg: EvoConfig, cycle_dir: Path) -> tupl
         ("reward", cfg.pipeline.reward),
     ]:
         result = run_cmd(name=name, cmd=cmd, cwd=candidate.path)
+        results.append(result)
         _write_command_result(cycle_dir, result)
+        _event(repo, run_id_value, "gate_finished", candidate, {"gate": name, "ok": result.ok, "returncode": result.returncode})
         if not result.ok:
-            return False, f"{name}_failed", result
-    return True, "all_gates_passed", None
+            write_benchmark_doc(repo, run_id_value, results)
+            return False, f"{name}_failed", result, results
+    write_benchmark_doc(repo, run_id_value, results)
+    return True, "all_gates_passed", None, results
 
 
 def _repair_prompt(repo: Path, cfg: EvoConfig, failed_gate: str, result: CommandResult) -> str:
@@ -97,6 +114,7 @@ def run_one_cycle(
     human_review: bool = False,
 ) -> dict[str, object]:
     repo = (config_path.parent / cfg.project.repo).resolve()
+    run_id_value = run_id(cycle, candidate_index, pool_size)
     base_prompt = (repo / cfg.agent.prompt_file).read_text()
     prompt = render_prompt(base_prompt, repo, cfg)
     candidate = create_candidate_worktree(
@@ -108,21 +126,28 @@ def run_one_cycle(
         candidate_index=candidate_index,
         pool_size=pool_size,
     )
-    cycle_dir = _cycle_dir(repo, cycle, candidate_index, pool_size)
+    cycle_dir = _cycle_dir(repo, run_id_value)
+    run_dir(repo, run_id_value).mkdir(parents=True, exist_ok=True)
+    write_context_doc(repo, run_id_value, config_path, cfg, candidate)
+    write_propose_doc(repo, run_id_value, prompt)
+    _event(repo, run_id_value, "candidate_created", candidate, {"candidate": str(candidate.path)})
     agent = CodexBackend(sandbox=cfg.agent.sandbox)
 
     agent_result = agent.run(prompt=prompt, cwd=candidate.path, timeout_s=cfg.agent.timeout_s)
     _write_text(cycle_dir / "codex.stdout", agent_result.stdout)
     _write_text(cycle_dir / "codex.stderr", agent_result.stderr)
+    _event(repo, run_id_value, "agent_finished", candidate, {"ok": agent_result.ok})
     if not agent_result.ok:
-        return _record_decision(repo, cycle, candidate, "reject", "agent_failed", None, cfg)
+        return _record_decision(repo, run_id_value, candidate, "reject", "agent_failed", None, cfg)
 
     guard = _check_guard(candidate, cfg, cycle_dir)
+    write_implement_doc(repo, run_id_value, candidate, guard)
+    _event(repo, run_id_value, "guard_finished", candidate, asdict(guard))
     if not guard.ok:
-        return _record_decision(repo, cycle, candidate, "reject", f"guard_failed:{guard.reason}", guard, cfg)
+        return _record_decision(repo, run_id_value, candidate, "reject", f"guard_failed:{guard.reason}", guard, cfg)
 
     commit_candidate(candidate.path, cycle)
-    passed, reason, failed_result = _run_pipeline(candidate, cfg, cycle_dir)
+    passed, reason, failed_result, _results = _run_pipeline(candidate, cfg, cycle_dir, repo, run_id_value)
 
     repair_attempt = 0
     while not passed and cfg.repair.enabled and failed_result and repair_attempt < cfg.repair.max_attempts:
@@ -130,22 +155,42 @@ def run_one_cycle(
         repair = agent.run(_repair_prompt(repo, cfg, reason, failed_result), candidate.path, cfg.agent.timeout_s)
         _write_text(cycle_dir / f"repair-{repair_attempt}.stdout", repair.stdout)
         _write_text(cycle_dir / f"repair-{repair_attempt}.stderr", repair.stderr)
+        _event(repo, run_id_value, "agent_finished", candidate, {"repair_attempt": repair_attempt, "ok": repair.ok})
         if not repair.ok:
-            return _record_decision(repo, cycle, candidate, "reject", "repair_agent_failed", guard, cfg)
+            return _record_decision(repo, run_id_value, candidate, "reject", "repair_agent_failed", guard, cfg)
         guard = _check_guard(candidate, cfg, cycle_dir)
+        write_implement_doc(repo, run_id_value, candidate, guard)
+        _event(repo, run_id_value, "guard_finished", candidate, asdict(guard))
         if not guard.ok:
-            return _record_decision(repo, cycle, candidate, "reject", f"guard_failed:{guard.reason}", guard, cfg)
+            return _record_decision(repo, run_id_value, candidate, "reject", f"guard_failed:{guard.reason}", guard, cfg)
         commit_candidate(candidate.path, cycle)
-        passed, reason, failed_result = _run_pipeline(candidate, cfg, cycle_dir)
+        passed, reason, failed_result, _results = _run_pipeline(candidate, cfg, cycle_dir, repo, run_id_value)
 
     if not passed:
-        return _record_decision(repo, cycle, candidate, "reject", reason, guard, cfg)
+        return _record_decision(repo, run_id_value, candidate, "reject", reason, guard, cfg)
 
     if human_review or cfg.human.review_on_accept:
         human_decision = review_candidate(candidate, guard)
-        return _record_decision(repo, cycle, candidate, human_decision.decision, human_decision.reason, guard, cfg)
+        _event(
+            repo,
+            run_id_value,
+            "human_review",
+            candidate,
+            {"decision": human_decision.decision, "comment": human_decision.comment, "next_hint": human_decision.next_hint},
+        )
+        return _record_decision(
+            repo,
+            run_id_value,
+            candidate,
+            human_decision.decision,
+            human_decision.reason,
+            guard,
+            cfg,
+            human_decision.comment,
+            human_decision.next_hint,
+        )
 
-    return _record_decision(repo, cycle, candidate, "accept", "all_gates_passed", guard, cfg)
+    return _record_decision(repo, run_id_value, candidate, "accept", "all_gates_passed", guard, cfg)
 
 
 def run_cycles(config_path: Path, cycles: int, human_review: bool = False) -> None:
