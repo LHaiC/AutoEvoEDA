@@ -45,6 +45,17 @@ evo run --config examples/abc/evo.yaml --cycles 5 --human-review
 
 Human review can accept, reject, keep, redirect, or pause an all-gates-passed candidate. Every option can include an optional comment and next hint. It does not bypass build, regression, performance, reward, or patch guards.
 
+For a long-running local loop, start the file-controlled daemon:
+
+```bash
+evo daemon --config examples/abc/evo.yaml --max-cycles 10 --sleep-s 30
+evo session comment --config examples/abc/evo.yaml "focus on mapper cleanup before new heuristics"
+evo session pause --config examples/abc/evo.yaml
+evo session resume --config examples/abc/evo.yaml
+```
+
+The daemon reloads `evo.yaml` between cycles, checks `.evo/session/state.json` before scheduling new work, and injects recent session comments through the normal memory path.
+
 ## Explicit Promotion
 
 Accepted or kept candidates are committed on their candidate branch, but are not promoted automatically. Promote a reviewed cycle explicitly:

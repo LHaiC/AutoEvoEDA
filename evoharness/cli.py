@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import argparse
 
+from evoharness.daemon import run_daemon
 from evoharness.gui import serve_gui
 from evoharness.pipeline.cycle import run_cycles
 from evoharness.promote import promote_cycle
@@ -17,6 +18,11 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
     run.add_argument("--cycles", type=int, default=1)
     run.add_argument("--human-review", action="store_true", help="pause for review after all gates pass")
+    daemon = subparsers.add_parser("daemon", help="run a file-controlled long-running evolution loop")
+    daemon.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
+    daemon.add_argument("--max-cycles", type=int, default=0, help="0 means run until paused or interrupted")
+    daemon.add_argument("--sleep-s", type=float, default=60.0)
+    daemon.add_argument("--human-review", action="store_true", help="pause for review after all gates pass")
     promote = subparsers.add_parser("promote", help="promote an accepted or kept cycle")
     promote.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
     promote.add_argument("--cycle", type=int, required=True)
@@ -39,6 +45,13 @@ def main() -> None:
     args = build_parser().parse_args()
     if args.command == "run":
         run_cycles(config_path=args.config, cycles=args.cycles, human_review=args.human_review)
+    if args.command == "daemon":
+        run_daemon(
+            config_path=args.config,
+            max_cycles=args.max_cycles,
+            sleep_s=args.sleep_s,
+            human_review=args.human_review,
+        )
     if args.command == "promote":
         promote_cycle(config_path=args.config, cycle=args.cycle, candidate_index=args.candidate)
     if args.command == "session":
