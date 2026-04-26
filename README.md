@@ -55,6 +55,13 @@ evo session resume --config examples/abc/evo.yaml
 ```
 
 The daemon reloads `evo.yaml` between cycles, checks `.evo/session/state.json` before scheduling new work, and injects recent session comments through the normal memory path.
+It also writes `.evo/session/daemon.lock`, `.evo/session/active.json`, and heartbeat events so long runs are inspectable and a second daemon is refused.
+
+Validate configuration before long runs:
+
+```bash
+evo config validate --config examples/abc/evo.yaml
+```
 
 ## Explicit Promotion
 

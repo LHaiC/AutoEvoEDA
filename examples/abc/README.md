@@ -224,6 +224,7 @@ evo session pause --config evo.yaml
 ```
 
 The daemon still runs the same guard and evaluator contract. It only adds a long-lived loop around the normal cycle runner.
+It refuses a second daemon with the same project `.evo/session/daemon.lock` and records heartbeat events.
 
 The local GUI exposes the same controls:
 

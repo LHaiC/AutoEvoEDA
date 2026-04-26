@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import argparse
 
+from evoharness.config import load_config
 from evoharness.daemon import run_daemon
 from evoharness.gui import serve_gui
 from evoharness.pipeline.cycle import run_cycles
@@ -41,6 +42,9 @@ def build_parser() -> argparse.ArgumentParser:
     rules.add_argument("proposal", nargs="?")
     rules.add_argument("comment", nargs="*")
     rules.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
+    config = subparsers.add_parser("config", help="validate evo.yaml")
+    config.add_argument("action", choices=["validate"])
+    config.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
     session = subparsers.add_parser("session", help="inspect or steer a local evolution session")
     session.add_argument("action", choices=["status", "comment", "pause", "resume"])
     session.add_argument("text", nargs="*")
@@ -97,6 +101,9 @@ def main() -> None:
             if not args.proposal:
                 raise SystemExit("rules reject requires a proposal id")
             print(reject_rule(args.config, args.proposal, " ".join(args.comment)))
+    if args.command == "config":
+        load_config(args.config)
+        print(f"ok: {args.config}")
     if args.command == "session":
         if args.action == "status":
             print(session_status(args.config))
