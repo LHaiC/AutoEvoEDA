@@ -189,3 +189,16 @@ agents:
 ```
 
 When a session id exists, the harness tries `codex exec resume`. If it is missing or resume fails and the policy is `new`, the role starts a new Codex invocation and records the event under `.evo/agents/<agent_id>/codex_session_events.jsonl`.
+
+## Rulebase Loop
+
+Long-running runs can propose durable prompt rules from recent evidence, but rulebase changes require explicit human approval:
+
+```bash
+evo rules propose --config examples/abc/evo.yaml
+evo rules list --config examples/abc/evo.yaml
+evo rules accept rule-YYYYMMDD-HHMMSS --config examples/abc/evo.yaml
+evo rules reject rule-YYYYMMDD-HHMMSS "not general enough" --config examples/abc/evo.yaml
+```
+
+Accepted proposals append to `.evo/memory/rulebase.md` and are injected into future prompts when memory is enabled.

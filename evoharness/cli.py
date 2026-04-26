@@ -7,6 +7,7 @@ from evoharness.daemon import run_daemon
 from evoharness.gui import serve_gui
 from evoharness.pipeline.cycle import run_cycles
 from evoharness.promote import promote_cycle
+from evoharness.rules import accept_rule, list_rule_proposals, propose_rules, reject_rule
 from evoharness.session import add_session_comment, session_status, set_session_status
 from evoharness.understand import run_understand
 from evoharness.worktrees import cleanup_worktrees, list_worktrees
@@ -35,6 +36,11 @@ def build_parser() -> argparse.ArgumentParser:
     worktree.add_argument("--older-than-days", type=int, default=0)
     worktree.add_argument("--include-accepted", action="store_true")
     worktree.add_argument("--force", action="store_true")
+    rules = subparsers.add_parser("rules", help="propose or approve rulebase updates")
+    rules.add_argument("action", choices=["list", "propose", "accept", "reject"])
+    rules.add_argument("proposal", nargs="?")
+    rules.add_argument("comment", nargs="*")
+    rules.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
     session = subparsers.add_parser("session", help="inspect or steer a local evolution session")
     session.add_argument("action", choices=["status", "comment", "pause", "resume"])
     session.add_argument("text", nargs="*")
@@ -75,6 +81,20 @@ def main() -> None:
                 force=args.force,
             ):
                 print(row)
+    if args.command == "rules":
+        if args.action == "list":
+            for proposal in list_rule_proposals(args.config):
+                print(proposal)
+        if args.action == "propose":
+            print(propose_rules(args.config))
+        if args.action == "accept":
+            if not args.proposal:
+                raise SystemExit("rules accept requires a proposal id")
+            print(accept_rule(args.config, args.proposal))
+        if args.action == "reject":
+            if not args.proposal:
+                raise SystemExit("rules reject requires a proposal id")
+            print(reject_rule(args.config, args.proposal, " ".join(args.comment)))
     if args.command == "session":
         if args.action == "status":
             print(session_status(args.config))

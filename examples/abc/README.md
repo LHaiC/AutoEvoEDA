@@ -250,3 +250,14 @@ agents:
 ```
 
 The framework-level memory files remain the durable context. Native Codex resume is an optimization for continuity, not a correctness requirement.
+
+## Rulebase Updates
+
+Use rule proposals to turn repeated lessons into durable steering rules:
+
+```bash
+evo rules propose --config evo.yaml
+evo rules accept rule-YYYYMMDD-HHMMSS --config evo.yaml
+```
+
+Accepted rules are appended to `.evo/memory/rulebase.md`; rejected proposals remain in `.evo/rules/` as evidence.
