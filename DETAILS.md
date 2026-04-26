@@ -111,7 +111,15 @@ evo session resume --config examples/abc/evo.yaml
 ```
 
 The daemon reloads `evo.yaml` between cycles, checks `.evo/session/state.json` before scheduling new work, and injects recent session comments through the normal memory path.
-It also writes `.evo/session/daemon.lock`, `.evo/session/active.json`, and heartbeat events so long runs are inspectable and a second daemon is refused.
+It also writes `.evo/session/daemon.lock`, `.evo/session/active.json`, `.evo/session/active_run.json`, and heartbeat events so long runs are inspectable and a second daemon is refused.
+
+Interrupted runs are detected before new work is scheduled. If a run has an active checkpoint but no final decision, `evo run` and `evo daemon` stop with an error instead of silently starting a new candidate. Inspect `.evo/runs/<run_id>/state.json`, then explicitly abandon the interrupted run if you want to continue:
+
+```bash
+evo run --config examples/abc/evo.yaml --abandon-active --cycles 0
+```
+
+This writes a deterministic reject decision with reason `abandoned_interrupted_run` and clears `.evo/session/active_run.json`.
 
 Validate configuration before long runs:
 
@@ -225,6 +233,8 @@ Each candidate writes an event stream and phase documents under `.evo/runs/<run_
 patch.diff
 events.jsonl
 evaluator_results.json
+state.json
+reproducibility.json
 ```
 
 The repository-level event log is `.evo/events.jsonl`. Human review decisions can include a comment and next hint; those fields are recorded in history, events, and decision documents.

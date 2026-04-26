@@ -65,6 +65,12 @@ ls .evo/runs/
 evo report --config examples/abc/evo.yaml
 ```
 
+If a run is interrupted before a final decision, inspect `.evo/runs/<run_id>/state.json` and explicitly abandon it before scheduling new work:
+
+```bash
+evo run --config examples/abc/evo.yaml --abandon-active --cycles 0
+```
+
 Optional long-running loop:
 
 ```bash

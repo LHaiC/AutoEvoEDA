@@ -25,6 +25,41 @@ def run_dir(repo: Path, value: str) -> Path:
     return repo / ".evo" / "runs" / value
 
 
+def active_run_path(repo: Path) -> Path:
+    return session_dir(repo) / "active_run.json"
+
+
+def write_run_state(
+    repo: Path,
+    run_id_value: str,
+    phase: str,
+    cycle: int,
+    candidate_index: int,
+    branch: str,
+    candidate: str,
+) -> None:
+    payload = {
+        "run_id": run_id_value,
+        "phase": phase,
+        "cycle": cycle,
+        "candidate_index": candidate_index,
+        "branch": branch,
+        "candidate": candidate,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    _write(run_dir(repo, run_id_value) / "state.json", json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    _write(active_run_path(repo), json.dumps(payload, indent=2, sort_keys=True) + "\n")
+
+
+def clear_active_run(repo: Path) -> None:
+    active_run_path(repo).unlink(missing_ok=True)
+
+
+def active_run(repo: Path) -> dict[str, Any] | None:
+    path = active_run_path(repo)
+    return json.loads(path.read_text()) if path.exists() else None
+
+
 def agent_dir(repo: Path, agent_id: str) -> Path:
     return repo / ".evo" / "agents" / agent_id
 

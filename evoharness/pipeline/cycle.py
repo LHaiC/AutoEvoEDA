@@ -8,8 +8,10 @@ from evoharness.agents.codex import CodexBackend, run_codex_role
 from evoharness.artifacts import (
     EvaluatorSnapshot,
     CommandResult,
+    active_run,
     append_event,
     append_history,
+    clear_active_run,
     collect_evaluator_results,
     read_agent_memory,
     read_history,
@@ -23,6 +25,7 @@ from evoharness.artifacts import (
     write_implement_doc,
     write_project_indexes,
     write_propose_doc,
+    write_run_state,
     run_cmd,
     write_agent_exchange,
     assert_not_paused,
@@ -77,6 +80,8 @@ def _record_decision(
     write_cycle_summary(repo, record)
     write_decision_doc(repo, run_id_value, record)
     _event(repo, run_id_value, "decision_recorded", candidate, {"decision": decision, "reason": reason})
+    write_run_state(repo, run_id_value, "decision_recorded", candidate.cycle, candidate.index, candidate.branch, str(candidate.path))
+    clear_active_run(repo)
     return record
 
 
@@ -84,6 +89,10 @@ def _write_command_result(cycle_dir: Path, result: CommandResult) -> None:
     _write_text(cycle_dir / f"{result.name}.stdout", result.stdout)
     _write_text(cycle_dir / f"{result.name}.stderr", result.stderr)
     _write_text(cycle_dir / f"{result.name}.returncode", f"{result.returncode}\n")
+
+
+def _checkpoint(repo: Path, run_id_value: str, phase: str, candidate: Candidate) -> None:
+    write_run_state(repo, run_id_value, phase, candidate.cycle, candidate.index, candidate.branch, str(candidate.path))
 
 
 def _check_guard(candidate: Candidate, cfg: EvoConfig, cycle_dir: Path, domain_agent: DomainAgentConfig | None = None) -> GuardResult:
@@ -110,6 +119,7 @@ def _run_pipeline(candidate: Candidate, cfg: EvoConfig, cycle_dir: Path, repo: P
         ("reward", cfg.pipeline.reward),
     ]:
         result = run_cmd(name=name, cmd=cmd, cwd=candidate.path)
+        _checkpoint(repo, run_id_value, f"{name}_finished", candidate)
         results.append(result)
         _write_command_result(cycle_dir, result)
         _event(repo, run_id_value, "gate_finished", candidate, {"gate": name, "ok": result.ok, "returncode": result.returncode})
@@ -225,6 +235,7 @@ def run_one_cycle(
     )
     cycle_dir = run_dir(repo, run_id_value)
     cycle_dir.mkdir(parents=True, exist_ok=True)
+    _checkpoint(repo, run_id_value, "candidate_created", candidate)
     write_context_doc(repo, run_id_value, config_path, cfg, candidate)
     _event(repo, run_id_value, "candidate_created", candidate, {"candidate": str(candidate.path)})
     agent = CodexBackend(sandbox=cfg.agent.sandbox)
@@ -238,6 +249,7 @@ def run_one_cycle(
             planner_prompt += "\n# Domain agent selection\nEmit exactly one line in this form:\nagent: <name>\nAvailable agents:\n"
             planner_prompt += "\n".join(f"- {agent.name}" for agent in cfg.domain_agents) + "\n"
         planner = run_codex_role(repo, cfg.agents.planner, agent, planner_prompt, candidate.path, cfg.agent.timeout_s)
+        _checkpoint(repo, run_id_value, "planner_finished", candidate)
         _write_text(cycle_dir / "planner.stdout", planner.stdout)
         _write_text(cycle_dir / "planner.stderr", planner.stderr)
         write_agent_exchange(repo, cfg.agents.planner.session_id, planner_prompt, planner.stdout, planner.stderr, planner.ok)
@@ -269,6 +281,7 @@ def run_one_cycle(
     coder_role = domain_agent or cfg.agents.coder
     agent_name = domain_agent.name if domain_agent else cfg.agents.coder.session_id
     agent_result = run_codex_role(repo, coder_role, agent, prompt, candidate.path, cfg.agent.timeout_s)
+    _checkpoint(repo, run_id_value, "agent_finished", candidate)
     _write_text(cycle_dir / "codex.stdout", agent_result.stdout)
     _write_text(cycle_dir / "codex.stderr", agent_result.stderr)
     write_agent_exchange(repo, coder_role.session_id, prompt, agent_result.stdout, agent_result.stderr, agent_result.ok)
@@ -282,6 +295,7 @@ def run_one_cycle(
             return _record_decision(repo, run_id_value, candidate, "reject", f"agent_proposal_failed:{exc}", None, cfg, agent=agent_name)
 
     guard = _check_guard(candidate, cfg, cycle_dir, domain_agent)
+    _checkpoint(repo, run_id_value, "guard_finished", candidate)
     write_implement_doc(repo, run_id_value, candidate, guard)
     _event(repo, run_id_value, "guard_finished", candidate, asdict(guard))
     if not guard.ok:
@@ -291,6 +305,7 @@ def run_one_cycle(
         review_prompt = _role_prompt(repo, cfg, cfg.roles.reviewer_prompt)
         review_prompt += "\n# Patch\n" + git(["diff"], cwd=candidate.path)
         review = run_codex_role(repo, cfg.agents.reviewer, agent, review_prompt, candidate.path, cfg.agent.timeout_s)
+        _checkpoint(repo, run_id_value, "reviewer_finished", candidate)
         _write_text(cycle_dir / "reviewer.stdout", review.stdout)
         _write_text(cycle_dir / "reviewer.stderr", review.stderr)
         write_agent_exchange(repo, cfg.agents.reviewer.session_id, review_prompt, review.stdout, review.stderr, review.ok)
@@ -299,6 +314,7 @@ def run_one_cycle(
             return _record_decision(repo, run_id_value, candidate, "reject", "reviewer_failed", guard, cfg, agent=agent_name)
 
     commit_candidate(candidate.path, cycle)
+    _checkpoint(repo, run_id_value, "committed", candidate)
     _write_reproducibility(cycle_dir, config_path, repo, candidate, cfg)
     passed, reason, failed_result, _results = _run_pipeline(candidate, cfg, cycle_dir, repo, run_id_value)
 
@@ -307,6 +323,7 @@ def run_one_cycle(
         repair_attempt += 1
         repair_prompt = _repair_prompt(repo, cfg, reason, failed_result)
         repair = run_codex_role(repo, cfg.agents.repair, agent, repair_prompt, candidate.path, cfg.agent.timeout_s)
+        _checkpoint(repo, run_id_value, f"repair_{repair_attempt}_finished", candidate)
         _write_text(cycle_dir / f"repair-{repair_attempt}.stdout", repair.stdout)
         _write_text(cycle_dir / f"repair-{repair_attempt}.stderr", repair.stderr)
         write_agent_exchange(repo, cfg.agents.repair.session_id, repair_prompt, repair.stdout, repair.stderr, repair.ok)
@@ -314,11 +331,13 @@ def run_one_cycle(
         if not repair.ok:
             return _record_decision(repo, run_id_value, candidate, "reject", "repair_agent_failed", guard, cfg, agent=agent_name)
         guard = _check_guard(candidate, cfg, cycle_dir, domain_agent)
+        _checkpoint(repo, run_id_value, f"repair_{repair_attempt}_guard_finished", candidate)
         write_implement_doc(repo, run_id_value, candidate, guard)
         _event(repo, run_id_value, "guard_finished", candidate, asdict(guard))
         if not guard.ok:
             return _record_decision(repo, run_id_value, candidate, "reject", f"guard_failed:{guard.reason}", guard, cfg, agent=agent_name)
         commit_candidate(candidate.path, cycle)
+        _checkpoint(repo, run_id_value, f"repair_{repair_attempt}_committed", candidate)
         _write_reproducibility(cycle_dir, config_path, repo, candidate, cfg)
         passed, reason, failed_result, _results = _run_pipeline(candidate, cfg, cycle_dir, repo, run_id_value)
 
@@ -326,6 +345,7 @@ def run_one_cycle(
         return _record_decision(repo, run_id_value, candidate, "reject", reason, guard, cfg, agent=agent_name)
 
     evaluator_snapshot = _collect_evaluator_snapshot(candidate, cfg, repo, run_id_value)
+    _checkpoint(repo, run_id_value, "evaluator_results_collected", candidate)
     if not evaluator_snapshot.ok:
         return _record_decision(
             repo,
@@ -383,13 +403,46 @@ def run_one_cycle(
     )
 
 
-def run_cycles(config_path: Path, cycles: int, human_review: bool = False) -> None:
+def _active_has_decision(repo: Path, active: dict[str, object]) -> bool:
+    return any(record.get("run_id") == active.get("run_id") and "decision" in record for record in read_history(repo))
+
+
+def abandon_active(config_path: Path) -> dict[str, object]:
+    cfg = load_config(config_path)
+    repo = (config_path.parent / cfg.project.repo).resolve()
+    active = active_run(repo)
+    if not active:
+        raise RuntimeError("no active interrupted run to abandon")
+    if _active_has_decision(repo, active):
+        clear_active_run(repo)
+        raise RuntimeError("active run already has a decision; cleared stale active marker")
+    candidate = Candidate(
+        cycle=int(active["cycle"]),
+        index=int(active.get("candidate_index", 1)),
+        branch=str(active["branch"]),
+        path=Path(str(active["candidate"])),
+    )
+    return _record_decision(repo, str(active["run_id"]), candidate, "reject", "abandoned_interrupted_run", None, cfg)
+
+
+def assert_no_interrupted_run(repo: Path) -> None:
+    active = active_run(repo)
+    if active and not _active_has_decision(repo, active):
+        raise RuntimeError(f"interrupted run exists: {active['run_id']}; inspect .evo/runs/{active['run_id']} then run `evo run --abandon-active --cycles 0`")
+    if active:
+        clear_active_run(repo)
+
+
+def run_cycles(config_path: Path, cycles: int, human_review: bool = False, abandon_active_run: bool = False) -> None:
     assert_not_paused(config_path)
     consecutive_rejects = 0
     scheduled_candidates = 0
     cfg = load_config(config_path)
     repo = (config_path.parent / cfg.project.repo).resolve()
     ensure_session(repo)
+    if abandon_active_run:
+        abandon_active(config_path)
+    assert_no_interrupted_run(repo)
     write_project_indexes(repo)
     history = [record for record in read_history(repo) if "decision" in record and "cycle" in record]
     completed_cycles = max([int(record["cycle"]) for record in history], default=0)

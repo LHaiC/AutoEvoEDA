@@ -7,7 +7,7 @@ import time
 
 from evoharness.artifacts import append_event, ensure_session, read_history, read_state, set_session_status, write_project_indexes
 from evoharness.config import EvoConfig, load_config
-from evoharness.pipeline.cycle import run_one_cycle
+from evoharness.pipeline.cycle import assert_no_interrupted_run, run_one_cycle
 
 
 def _repo(config_path: Path, cfg: EvoConfig) -> Path:
@@ -40,6 +40,7 @@ def run_daemon(config_path: Path, max_cycles: int = 0, sleep_s: float = 60.0, hu
     cfg = load_config(config_path)
     repo = _repo(config_path, cfg)
     ensure_session(repo)
+    assert_no_interrupted_run(repo)
     lock = _lock(repo)
     append_event(repo, "daemon", "daemon_started", 0, 0, "", {"max_cycles": max_cycles, "sleep_s": sleep_s})
 
