@@ -21,7 +21,7 @@ from evoharness.pipeline.runner import CommandResult, run_cmd
 from evoharness.reports import write_cycle_summary, write_project_indexes
 from evoharness.session import assert_not_paused, ensure_session
 from evoharness.state import append_history
-from evoharness.workspace.git import Candidate, commit_candidate, create_candidate_worktree
+from evoharness.workspace.git import Candidate, commit_candidate, create_candidate_worktree, git
 from evoharness.workspace.guard import GuardResult, check_patch_scope
 
 
@@ -129,6 +129,10 @@ def _repair_prompt(repo: Path, cfg: EvoConfig, failed_gate: str, result: Command
     return render_repair_prompt(render_prompt(base_prompt, repo, cfg), failed_gate, result.stdout, result.stderr)
 
 
+def _role_prompt(repo: Path, cfg: EvoConfig, path: str) -> str:
+    return render_prompt((repo / path).read_text(), repo, cfg) if path else ""
+
+
 def run_one_cycle(
     config_path: Path,
     cfg: EvoConfig,
@@ -139,8 +143,6 @@ def run_one_cycle(
 ) -> dict[str, object]:
     repo = (config_path.parent / cfg.project.repo).resolve()
     run_id_value = run_id(cycle, candidate_index, pool_size)
-    base_prompt = (repo / cfg.agent.prompt_file).read_text()
-    prompt = render_prompt(base_prompt, repo, cfg)
     candidate = create_candidate_worktree(
         repo=repo,
         champion_branch=cfg.project.champion_branch,
@@ -153,9 +155,26 @@ def run_one_cycle(
     cycle_dir = run_dir(repo, run_id_value)
     cycle_dir.mkdir(parents=True, exist_ok=True)
     write_context_doc(repo, run_id_value, config_path, cfg, candidate)
-    write_propose_doc(repo, run_id_value, prompt)
     _event(repo, run_id_value, "candidate_created", candidate, {"candidate": str(candidate.path)})
     agent = CodexBackend(sandbox=cfg.agent.sandbox)
+
+    planner_notes = ""
+    if cfg.multi_agent.planner and cfg.roles.planner_prompt:
+        planner_prompt = _role_prompt(repo, cfg, cfg.roles.planner_prompt)
+        planner = run_codex_role(repo, cfg.agents.planner, agent, planner_prompt, candidate.path, cfg.agent.timeout_s)
+        _write_text(cycle_dir / "planner.stdout", planner.stdout)
+        _write_text(cycle_dir / "planner.stderr", planner.stderr)
+        write_agent_exchange(repo, cfg.agents.planner.session_id, planner_prompt, planner.stdout, planner.stderr, planner.ok)
+        _event(repo, run_id_value, "planner_finished", candidate, {"ok": planner.ok})
+        if not planner.ok:
+            return _record_decision(repo, run_id_value, candidate, "reject", "planner_failed", None, cfg)
+        planner_notes = planner.stdout.strip()
+
+    base_prompt = (repo / cfg.agent.prompt_file).read_text()
+    prompt = render_prompt(base_prompt, repo, cfg)
+    if planner_notes:
+        prompt += "\n# Planner Notes\n" + planner_notes + "\n"
+    write_propose_doc(repo, run_id_value, prompt)
 
     agent_result = run_codex_role(repo, cfg.agents.coder, agent, prompt, candidate.path, cfg.agent.timeout_s)
     _write_text(cycle_dir / "codex.stdout", agent_result.stdout)
@@ -171,6 +190,17 @@ def run_one_cycle(
     if not guard.ok:
         return _record_decision(repo, run_id_value, candidate, "reject", f"guard_failed:{guard.reason}", guard, cfg)
 
+    if cfg.multi_agent.reviewer and cfg.roles.reviewer_prompt:
+        review_prompt = _role_prompt(repo, cfg, cfg.roles.reviewer_prompt)
+        review_prompt += "\n# Patch\n" + git(["diff"], cwd=candidate.path)
+        review = run_codex_role(repo, cfg.agents.reviewer, agent, review_prompt, candidate.path, cfg.agent.timeout_s)
+        _write_text(cycle_dir / "reviewer.stdout", review.stdout)
+        _write_text(cycle_dir / "reviewer.stderr", review.stderr)
+        write_agent_exchange(repo, cfg.agents.reviewer.session_id, review_prompt, review.stdout, review.stderr, review.ok)
+        _event(repo, run_id_value, "reviewer_finished", candidate, {"ok": review.ok})
+        if not review.ok:
+            return _record_decision(repo, run_id_value, candidate, "reject", "reviewer_failed", guard, cfg)
+
     commit_candidate(candidate.path, cycle)
     passed, reason, failed_result, _results = _run_pipeline(candidate, cfg, cycle_dir, repo, run_id_value)
 
@@ -178,11 +208,11 @@ def run_one_cycle(
     while not passed and cfg.repair.enabled and failed_result and repair_attempt < cfg.repair.max_attempts:
         repair_attempt += 1
         repair_prompt = _repair_prompt(repo, cfg, reason, failed_result)
-        repair = run_codex_role(repo, cfg.agents.coder, agent, repair_prompt, candidate.path, cfg.agent.timeout_s)
+        repair = run_codex_role(repo, cfg.agents.repair, agent, repair_prompt, candidate.path, cfg.agent.timeout_s)
         _write_text(cycle_dir / f"repair-{repair_attempt}.stdout", repair.stdout)
         _write_text(cycle_dir / f"repair-{repair_attempt}.stderr", repair.stderr)
-        write_agent_exchange(repo, cfg.agents.coder.session_id, repair_prompt, repair.stdout, repair.stderr, repair.ok)
-        _event(repo, run_id_value, "agent_finished", candidate, {"agent_id": cfg.agents.coder.session_id, "repair_attempt": repair_attempt, "ok": repair.ok})
+        write_agent_exchange(repo, cfg.agents.repair.session_id, repair_prompt, repair.stdout, repair.stderr, repair.ok)
+        _event(repo, run_id_value, "agent_finished", candidate, {"agent_id": cfg.agents.repair.session_id, "repair_attempt": repair_attempt, "ok": repair.ok})
         if not repair.ok:
             return _record_decision(repo, run_id_value, candidate, "reject", "repair_agent_failed", guard, cfg)
         guard = _check_guard(candidate, cfg, cycle_dir)

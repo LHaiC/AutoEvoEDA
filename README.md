@@ -89,6 +89,9 @@ repair:
 Role prompt files can align the run with planner/coder/reviewer guidance without creating multiple agents:
 
 ```yaml
+multi_agent:
+  planner: true
+  reviewer: true
 roles:
   planner_prompt: prompts/planner.md
   coder_prompt: prompts/coder.md
@@ -96,6 +99,8 @@ roles:
 rulebase:
   path: .evo/memory/rulebase.md
 ```
+
+When enabled, the planner writes `planner.stdout` before coding and its notes are appended to the coder prompt. The reviewer writes `reviewer.stdout` after patch guards and before evaluator gates; evaluators still decide correctness and performance.
 
 Run small candidate pools with explicit budgets:
 

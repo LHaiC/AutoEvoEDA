@@ -105,7 +105,15 @@ class AgentsConfig:
     planner: AgentRoleConfig
     coder: AgentRoleConfig
     reviewer: AgentRoleConfig
+    repair: AgentRoleConfig
+    rulebase: AgentRoleConfig
     code_understanding: AgentRoleConfig
+
+
+@dataclass(frozen=True)
+class MultiAgentConfig:
+    planner: bool
+    reviewer: bool
 
 
 @dataclass(frozen=True)
@@ -136,6 +144,7 @@ class EvoConfig:
     pool: PoolConfig
     budget: BudgetConfig
     agents: AgentsConfig
+    multi_agent: MultiAgentConfig
 
 
 def _section(data: dict[str, Any], name: str) -> dict[str, Any]:
@@ -195,6 +204,7 @@ def load_config(path: Path) -> EvoConfig:
     rulebase = {"path": ".evo/memory/rulebase.md", **_optional_section(data, "rulebase")}
     pool = {"enabled": False, "size": 1, **_optional_section(data, "pool")}
     budget = {"max_cycles": 0, "max_candidates": 0, **_optional_section(data, "budget")}
+    multi_agent = {"planner": False, "reviewer": False, **_optional_section(data, "multi_agent")}
     result_files = {
         "correctness": "results/correctness.json",
         "qor": "results/qor.json",
@@ -222,6 +232,9 @@ def load_config(path: Path) -> EvoConfig:
             planner=_agent_role(agents_data, "planner", "planner-main"),
             coder=_agent_role(agents_data, "coder", "coder-main"),
             reviewer=_agent_role(agents_data, "reviewer", "reviewer-main"),
+            repair=_agent_role(agents_data, "repair", "repair-main"),
+            rulebase=_agent_role(agents_data, "rulebase", "rulebase-main"),
             code_understanding=_agent_role(agents_data, "code_understanding", "understand-main"),
         ),
+        multi_agent=MultiAgentConfig(**multi_agent),
     )

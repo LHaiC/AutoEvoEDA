@@ -69,6 +69,10 @@ pool:
   enabled: false
   size: 1
 
+multi_agent:
+  planner: false
+  reviewer: false
+
 budget:
   max_cycles: 0
   max_candidates: 0
@@ -85,6 +89,10 @@ agents:
       on_resume_failure: new
   reviewer:
     session_id: reviewer-main
+  repair:
+    session_id: repair-main
+  rulebase:
+    session_id: rulebase-main
   code_understanding:
     session_id: understand-main
     codex_session:

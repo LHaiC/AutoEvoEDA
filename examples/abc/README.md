@@ -180,6 +180,16 @@ Advisory planning guidance. It should narrow the search target before the coding
 
 Advisory review guidance. It should describe risks the coding agent must avoid, such as hard-coded benchmark names, weakened equivalence checks, or scope creep. It cannot accept a patch.
 
+Enable opt-in planner/reviewer Codex calls with:
+
+```yaml
+multi_agent:
+  planner: true
+  reviewer: true
+```
+
+The planner output is injected into the coder prompt. The reviewer output is advisory and cannot replace evaluator gates.
+
 ### `prompts/repair.md`
 
 Repair guidance used when `repair.enabled` is true and a gate fails. Keep this prompt focused on fixing the failing gate without weakening evaluators.
