@@ -34,6 +34,12 @@ pipeline:
   perf: bash scripts/run_perf.sh
   reward: python scripts/reward.py
 
+result_files:
+  correctness: results/correctness.json
+  qor: results/qor.json
+  perf: results/perf.json
+  reward: results/reward.json
+
 memory:
   enabled: true
   project_memory: .evo/memory/project.md

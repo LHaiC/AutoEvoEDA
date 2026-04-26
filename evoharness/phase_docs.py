@@ -91,5 +91,9 @@ def write_decision_doc(repo: Path, run_id_value: str, record: dict[str, Any]) ->
         lines.extend([f"- Human comment: {record['human_comment']}"])
     if record.get("next_hint"):
         lines.extend([f"- Next hint: {record['next_hint']}"])
+    evaluator_results = record.get("evaluator_results", {})
+    if isinstance(evaluator_results, dict) and evaluator_results:
+        lines.extend(["", "## Evaluator Results", ""])
+        lines.extend([f"- `{name}`" for name in sorted(evaluator_results)])
     lines.append("")
     _write(run_dir(repo, run_id_value) / "04_decision.md", "\n".join(lines))

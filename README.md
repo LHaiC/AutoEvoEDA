@@ -21,6 +21,18 @@ A project provides `evo.yaml`, a prompt, and scripts for build, regression, perf
 
 `evo-harness` never trusts the agent to decide correctness or performance.
 
+Project scripts may also write structured evaluator result files. The harness records any existing JSON object files in each cycle summary and history:
+
+```yaml
+result_files:
+  correctness: results/correctness.json
+  qor: results/qor.json
+  perf: results/perf.json
+  reward: results/reward.json
+```
+
+These files are adapter-owned. For ABC-style work, `correctness.json` can summarize equivalence checks, `qor.json` can store area/depth/runtime deltas, and `reward.json` can store the final scalar or gate decision.
+
 ## Long-Running Controls
 
 Enable memory in `evo.yaml` to inject project memory, recent lessons, rejected ideas, accepted patterns, and patch scope into the Codex prompt. Lessons are appended to `.evo/memory/lessons.jsonl` after each cycle.
@@ -90,6 +102,7 @@ Each candidate writes an event stream and phase documents under `.evo/runs/<run_
 04_decision.md
 patch.diff
 events.jsonl
+evaluator_results.json
 ```
 
 The repository-level event log is `.evo/events.jsonl`. Human review decisions can include a comment and next hint; those fields are recorded in history, events, and decision documents.

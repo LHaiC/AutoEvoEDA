@@ -8,6 +8,11 @@ from evoharness.agent_state import write_agent_exchange
 from evoharness.agents.codex import CodexBackend
 from evoharness.config import EvoConfig, load_config
 from evoharness.events import append_event, run_dir, run_id
+from evoharness.evaluator_results import (
+    EvaluatorSnapshot,
+    collect_evaluator_results,
+    write_evaluator_results,
+)
 from evoharness.human import review_candidate
 from evoharness.memory import append_lesson, render_prompt, render_repair_prompt
 from evoharness.phase_docs import write_benchmark_doc, write_context_doc, write_decision_doc, write_implement_doc, write_propose_doc
@@ -42,6 +47,7 @@ def _record_decision(
     cfg: EvoConfig,
     human_comment: str = "",
     next_hint: str = "",
+    evaluator_results: dict[str, object] | None = None,
 ) -> dict[str, object]:
     record = {
         "cycle": candidate.cycle,
@@ -55,6 +61,7 @@ def _record_decision(
         "changed_lines": guard.changed_lines if guard else 0,
         "human_comment": human_comment,
         "next_hint": next_hint,
+        "evaluator_results": evaluator_results or {},
     }
     append_history(repo, record)
     append_lesson(repo, cfg, record)
@@ -100,6 +107,24 @@ def _run_pipeline(candidate: Candidate, cfg: EvoConfig, cycle_dir: Path, repo: P
             return False, f"{name}_failed", result, results
     write_benchmark_doc(repo, run_id_value, results)
     return True, "all_gates_passed", None, results
+
+
+def _collect_evaluator_snapshot(
+    candidate: Candidate,
+    cfg: EvoConfig,
+    repo: Path,
+    run_id_value: str,
+) -> EvaluatorSnapshot:
+    snapshot = collect_evaluator_results(candidate.path, cfg.result_files)
+    write_evaluator_results(run_dir(repo, run_id_value) / "evaluator_results.json", snapshot)
+    _event(
+        repo,
+        run_id_value,
+        "evaluator_results_collected",
+        candidate,
+        {"ok": snapshot.ok, "reason": snapshot.reason, "files": sorted(snapshot.data)},
+    )
+    return snapshot
 
 
 def _repair_prompt(repo: Path, cfg: EvoConfig, failed_gate: str, result: CommandResult) -> str:
@@ -174,6 +199,19 @@ def run_one_cycle(
     if not passed:
         return _record_decision(repo, run_id_value, candidate, "reject", reason, guard, cfg)
 
+    evaluator_snapshot = _collect_evaluator_snapshot(candidate, cfg, repo, run_id_value)
+    if not evaluator_snapshot.ok:
+        return _record_decision(
+            repo,
+            run_id_value,
+            candidate,
+            "reject",
+            f"evaluator_results_failed:{evaluator_snapshot.reason}",
+            guard,
+            cfg,
+            evaluator_results=evaluator_snapshot.data,
+        )
+
     if human_review or cfg.human.review_on_accept:
         human_decision = review_candidate(candidate, guard)
         _event(
@@ -193,9 +231,19 @@ def run_one_cycle(
             cfg,
             human_decision.comment,
             human_decision.next_hint,
+            evaluator_snapshot.data,
         )
 
-    return _record_decision(repo, run_id_value, candidate, "accept", "all_gates_passed", guard, cfg)
+    return _record_decision(
+        repo,
+        run_id_value,
+        candidate,
+        "accept",
+        "all_gates_passed",
+        guard,
+        cfg,
+        evaluator_results=evaluator_snapshot.data,
+    )
 
 
 def run_cycles(config_path: Path, cycles: int, human_review: bool = False) -> None:

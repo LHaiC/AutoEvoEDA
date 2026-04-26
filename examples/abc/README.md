@@ -27,6 +27,7 @@ champion branch
 worktree root
 allowed and forbidden patch paths
 pipeline commands
+structured evaluator result files
 ```
 
 Keep project-specific benchmark paths and commands here or inside scripts. Do not hard-code them in `evo-harness` Python code.
@@ -109,6 +110,21 @@ non-zero   reward target failed
 ```
 
 This script is also an evaluator and should be forbidden for candidate edits.
+
+## Structured Result Files
+
+Project scripts may write JSON object files under `results/`. The harness copies their parsed content into `.evo/<run_id>/evaluator_results.json`, `.evo/history.jsonl`, and the cycle summary.
+
+Suggested ABC-shaped files:
+
+```text
+results/correctness.json   CEC or approved oracle pass/fail counts
+results/qor.json           area, depth, runtime, and delta vectors
+results/perf.json          benchmark timing measurements
+results/reward.json        final scalar reward or gate explanation
+```
+
+Keep these files machine-readable and separate from stdout logs. If a configured result file exists but is not a JSON object, the candidate is rejected after the normal gates finish.
 
 ## What Not To Put In The Framework
 

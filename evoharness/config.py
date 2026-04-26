@@ -44,6 +44,14 @@ class PipelineConfig:
 
 
 @dataclass(frozen=True)
+class ResultFilesConfig:
+    correctness: str
+    qor: str
+    perf: str
+    reward: str
+
+
+@dataclass(frozen=True)
 class MemoryConfig:
     enabled: bool
     project_memory: str
@@ -110,6 +118,7 @@ class EvoConfig:
     workspace: WorkspaceConfig
     guards: GuardConfig
     pipeline: PipelineConfig
+    result_files: ResultFilesConfig
     memory: MemoryConfig
     human: HumanConfig
     repair: RepairConfig
@@ -155,6 +164,13 @@ def load_config(path: Path) -> EvoConfig:
     rulebase = {"path": ".evo/memory/rulebase.md", **_optional_section(data, "rulebase")}
     pool = {"enabled": False, "size": 1, **_optional_section(data, "pool")}
     budget = {"max_cycles": 0, "max_candidates": 0, **_optional_section(data, "budget")}
+    result_files = {
+        "correctness": "results/correctness.json",
+        "qor": "results/qor.json",
+        "perf": "results/perf.json",
+        "reward": "results/reward.json",
+        **_optional_section(data, "result_files"),
+    }
     agents_data = _optional_section(data, "agents")
     agents = {
         "planner": {"session_id": "planner-main", **agents_data.get("planner", {})},
@@ -169,6 +185,7 @@ def load_config(path: Path) -> EvoConfig:
         workspace=WorkspaceConfig(**_section(data, "workspace")),
         guards=GuardConfig(**_section(data, "guards")),
         pipeline=PipelineConfig(**_section(data, "pipeline")),
+        result_files=ResultFilesConfig(**result_files),
         memory=MemoryConfig(**memory),
         human=HumanConfig(**human),
         repair=RepairConfig(**repair),

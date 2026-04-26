@@ -17,6 +17,9 @@ def write_cycle_summary(repo: Path, record: dict[str, Any]) -> Path:
     cycle_dir_name = _cycle_dir_name(record)
     cycle_dir = repo / ".evo" / cycle_dir_name
     cycle_dir.mkdir(parents=True, exist_ok=True)
+    evaluator_results = record.get("evaluator_results", {})
+    has_results = isinstance(evaluator_results, dict) and bool(evaluator_results)
+    result_keys = ", ".join(sorted(evaluator_results)) if has_results else "none"
     path = cycle_dir / "summary.md"
     path.write_text(
         "\n".join(
@@ -29,6 +32,7 @@ def write_cycle_summary(repo: Path, record: dict[str, Any]) -> Path:
                 f"- Reason: `{record['reason']}`",
                 f"- Changed files: {record['changed_files']}",
                 f"- Changed lines: {record['changed_lines']}",
+                f"- Evaluator results: {result_keys}",
                 "",
                 "## Artifacts",
                 "",
@@ -39,6 +43,7 @@ def write_cycle_summary(repo: Path, record: dict[str, Any]) -> Path:
                 f"- Regression stdout: `.evo/{cycle_dir_name}/regression.stdout`",
                 f"- Performance stdout: `.evo/{cycle_dir_name}/perf.stdout`",
                 f"- Reward stdout: `.evo/{cycle_dir_name}/reward.stdout`",
+                f"- Evaluator results: `.evo/runs/{cycle_dir_name}/evaluator_results.json`",
                 "",
             ]
         )
