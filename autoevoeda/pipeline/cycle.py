@@ -287,7 +287,7 @@ def run_one_cycle(
     _checkpoint(repo, run_id_value, "candidate_created", candidate)
     write_context_doc(repo, run_id_value, config_path, cfg, candidate)
     _event(repo, run_id_value, "candidate_created", candidate, {"candidate": str(candidate.path)})
-    agent = CodexBackend(sandbox=cfg.agent.sandbox)
+    agent = CodexBackend(sandbox=cfg.agent.sandbox, model=cfg.agent.model, profile=cfg.agent.profile, config=cfg.agent.config)
 
     planner_notes = ""
     domain_agent = None

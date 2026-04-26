@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
+import json
 import subprocess
 
 from autoevoeda.artifacts import read_codex_session, write_codex_session_event
@@ -17,14 +19,17 @@ class AgentResult:
 
 
 class CodexBackend:
-    def __init__(self, sandbox: str = "workspace-write") -> None:
+    def __init__(self, sandbox: str = "workspace-write", model: str = "", profile: str = "", config: dict[str, Any] | None = None) -> None:
         self.sandbox = sandbox
+        self.model = model
+        self.profile = profile
+        self.config = config or {}
 
     def run(self, prompt: str, cwd: Path, timeout_s: int, session_id: str = "") -> AgentResult:
-        cmd = ["codex", "exec", "--full-auto", "--sandbox", self.sandbox, prompt]
+        cmd = ["codex", "exec", *self._model_args(include_profile=True), "--full-auto", "--sandbox", self.sandbox, "--skip-git-repo-check", prompt]
         mode = "new"
         if session_id:
-            cmd = ["codex", "exec", "resume", "--full-auto", session_id, prompt]
+            cmd = ["codex", "exec", "resume", *self._model_args(include_profile=False), "--full-auto", "--skip-git-repo-check", session_id, prompt]
             mode = "resume"
         proc = subprocess.run(
             cmd,
@@ -35,6 +40,28 @@ class CodexBackend:
             timeout=timeout_s,
         )
         return AgentResult(ok=proc.returncode == 0, stdout=proc.stdout, stderr=proc.stderr, session_mode=mode)
+
+    def _model_args(self, include_profile: bool) -> list[str]:
+        args = []
+        if self.model:
+            args.extend(["--model", self.model])
+        if include_profile and self.profile:
+            args.extend(["--profile", self.profile])
+        for key, value in self.config.items():
+            args.extend(["--config", f"{key}={_toml_value(value)}"])
+        return args
+
+
+def _toml_value(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, str):
+        return json.dumps(value)
+    if isinstance(value, list):
+        return "[" + ", ".join(_toml_value(item) for item in value) + "]"
+    raise TypeError(f"unsupported agent.config value type: {type(value).__name__}")
 
 
 def run_codex_role(

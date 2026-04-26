@@ -9,6 +9,9 @@ agent:
   prompt_file: prompts/coder.md
   timeout_s: 3600
   sandbox: workspace-write
+  model: ""
+  profile: ""
+  config: {}
 
 workspace:
   worktree_root: ../.evo-worktrees

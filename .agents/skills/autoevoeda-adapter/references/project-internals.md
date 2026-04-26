@@ -71,6 +71,8 @@ If `domain_agents` is non-empty, config validation requires `multi_agent.planner
 
 Domain-agent Codex output must include `hypothesis:`, `target_files:`, `expected_metric_impact:`, and `rollback_risk:` so `cycle.py` can write `agent_proposal.json` and `agent_proposal.md`.
 
+`agent.model`, `agent.profile`, and `agent.config` are passed through `agents/codex.py` to Codex CLI as `--model`, `--profile`, and repeated `--config key=value` flags. Empty values defer to the user's Codex config.
+
 ## Safety Invariants
 
 - Do not put ABC-specific or project-specific metric logic in `autoevoeda/`; adapters own scripts and reward formulas.

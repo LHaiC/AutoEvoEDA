@@ -19,6 +19,9 @@ class AgentConfig:
     prompt_file: str
     timeout_s: int
     sandbox: str
+    model: str
+    profile: str
+    config: dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -204,6 +207,14 @@ def _optional_section(data: dict[str, Any], name: str) -> dict[str, Any]:
     return value
 
 
+def _check_agent_config(value: Any) -> None:
+    if isinstance(value, (str, int, float, bool)):
+        return
+    if isinstance(value, list) and all(isinstance(item, (str, int, float, bool)) for item in value):
+        return
+    raise ValueError("agent.config values must be scalar or scalar lists")
+
+
 def _agent_role(data: dict[str, Any], name: str, default_session_id: str) -> AgentRoleConfig:
     raw = data.get(name, {})
     if not isinstance(raw, dict):
@@ -307,7 +318,11 @@ def load_config(path: Path) -> EvoConfig:
         raise ValueError("config root must be a mapping")
 
     project = {"champion_branch": "", **_section(data, "project")}
-    agent = {"timeout_s": 3600, "sandbox": "workspace-write", **_section(data, "agent")}
+    agent = {"timeout_s": 3600, "sandbox": "workspace-write", "model": "", "profile": "", "config": {}, **_section(data, "agent")}
+    if not isinstance(agent["config"], dict):
+        raise ValueError("agent.config must be a mapping")
+    for value in agent["config"].values():
+        _check_agent_config(value)
     memory = {
         "enabled": False,
         "project_memory": ".evo/memory/project.md",

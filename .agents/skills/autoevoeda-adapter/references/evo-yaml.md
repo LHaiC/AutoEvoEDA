@@ -14,6 +14,9 @@ agent:
   prompt_file: prompts/coder.md
   timeout_s: 3600
   sandbox: workspace-write
+  model: ""
+  profile: ""
+  config: {}
 
 runner:
   sandbox: workspace-write
@@ -107,6 +110,20 @@ agents:
 ## Multi-Repo Workspaces
 
 For sibling git repositories, use `workspace.mode: multi_repo`; see `multi-repo-workspace.md`. In that mode, `workspace.repos[*].allowed_paths` are local to each child repo and `guards.allowed_paths` should use candidate-root paths such as `mapper/src/`.
+
+## Agent Model Selection
+
+Leave `agent.model`, `agent.profile`, and `agent.config` empty to use the user's Codex defaults. To make an adapter reproducible, set generic Codex CLI overrides without embedding machine-local provider names in public examples:
+
+```yaml
+agent:
+  model: gpt-5.5
+  profile: ""
+  config:
+    model_reasoning_effort: high
+```
+
+`agent.config` maps to repeated `codex exec --config key=value` arguments and should contain scalar or list values. `agent.profile` applies to fresh `codex exec`; native `codex exec resume` does not currently expose `--profile`, so put resume-critical options in `agent.config`.
 
 ## Runner Contract
 

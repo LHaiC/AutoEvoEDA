@@ -27,6 +27,7 @@ What each project provides:
 - prompts under `prompts/`
 - adapter scripts under `scripts/`
 - project-specific correctness, QoR, performance, and reward logic
+- optional Codex model/profile/config overrides in `agent`
 
 `AutoEvoEDA` never trusts the agent to decide correctness or performance.
 

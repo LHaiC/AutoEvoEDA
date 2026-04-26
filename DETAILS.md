@@ -36,6 +36,18 @@ result_files:
 
 These files are adapter-owned. For ABC-style work, `correctness.json` can summarize equivalence checks, `qor.json` can store area/depth/runtime deltas, and `reward.json` can store the final scalar or gate decision.
 
+Codex model selection is adapter-configurable but optional:
+
+```yaml
+agent:
+  model: gpt-5.5
+  profile: ""
+  config:
+    model_reasoning_effort: high
+```
+
+Empty values use the user's Codex defaults. `agent.config` maps to `codex exec --config key=value` overrides; public examples should avoid machine-local provider names. `agent.profile` applies to fresh `codex exec`; put resume-critical options in `agent.config` because `codex exec resume` does not expose `--profile`.
+
 ## Paper Fidelity Status
 
 `AutoEvoEDA` implements the reusable outer loop from arXiv:2604.15082v1: Codex invocation, candidate worktrees, patch guards, event logs, run directories, phase documents, human comments, memory injection, local GUI inspection/control, rule proposals, and explicit promotion.
