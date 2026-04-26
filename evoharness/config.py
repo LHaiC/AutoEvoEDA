@@ -99,6 +99,16 @@ class AgentRoleConfig:
 
 
 @dataclass(frozen=True)
+class DomainAgentConfig:
+    name: str
+    session_id: str
+    prompt_file: str
+    allowed_paths: list[str]
+    forbidden_paths: list[str]
+    codex_session: CodexSessionConfig
+
+
+@dataclass(frozen=True)
 class AgentsConfig:
     planner: AgentRoleConfig
     coder: AgentRoleConfig
@@ -148,6 +158,7 @@ class EvoConfig:
     pool: PoolConfig
     budget: BudgetConfig
     agents: AgentsConfig
+    domain_agents: list[DomainAgentConfig]
     multi_agent: MultiAgentConfig
     promotion: PromotionConfig
 
@@ -183,6 +194,42 @@ def _agent_role(data: dict[str, Any], name: str, default_session_id: str) -> Age
     return AgentRoleConfig(**role, session_id=session_id, codex_session=CodexSessionConfig(**codex_session))
 
 
+def _domain_agents(data: dict[str, Any]) -> list[DomainAgentConfig]:
+    raw = data.get("domain_agents", [])
+    if not isinstance(raw, list):
+        raise ValueError("domain_agents must be a list")
+    agents = []
+    for item in raw:
+        if not isinstance(item, dict):
+            raise ValueError("domain_agents entries must be mappings")
+        name = str(item["name"])
+        session_id = str(item.get("session_id", f"{name}-main"))
+        codex_data = item.get("codex_session", {})
+        if not isinstance(codex_data, dict):
+            raise ValueError(f"codex_session must be a mapping: domain_agents.{name}")
+        if not isinstance(item["allowed_paths"], list):
+            raise ValueError(f"allowed_paths must be a list: domain_agents.{name}")
+        forbidden_paths = item.get("forbidden_paths", [])
+        if not isinstance(forbidden_paths, list):
+            raise ValueError(f"forbidden_paths must be a list: domain_agents.{name}")
+        agents.append(
+            DomainAgentConfig(
+                name=name,
+                session_id=session_id,
+                prompt_file=str(item["prompt_file"]),
+                allowed_paths=list(item["allowed_paths"]),
+                forbidden_paths=list(forbidden_paths),
+                codex_session=CodexSessionConfig(
+                    enabled=bool(codex_data.get("enabled", False)),
+                    session_file=str(codex_data.get("session_file", f".evo/agents/{session_id}/codex_session.txt")),
+                ),
+            )
+        )
+    if len({agent.name for agent in agents}) != len(agents):
+        raise ValueError("domain_agents names must be unique")
+    return agents
+
+
 def load_config(path: Path) -> EvoConfig:
     data = yaml.safe_load(path.read_text())
     if not isinstance(data, dict):
@@ -214,6 +261,9 @@ def load_config(path: Path) -> EvoConfig:
         **_optional_section(data, "result_files"),
     }
     agents_data = _optional_section(data, "agents")
+    domain_agents = _domain_agents(data)
+    if domain_agents and (not multi_agent["planner"] or not roles["planner_prompt"]):
+        raise ValueError("domain_agents require multi_agent.planner and roles.planner_prompt")
 
     return EvoConfig(
         schema_version=str(data.get("schema_version", "1.0")),
@@ -238,6 +288,7 @@ def load_config(path: Path) -> EvoConfig:
             rulebase=_agent_role(agents_data, "rulebase", "rulebase-main"),
             code_understanding=_agent_role(agents_data, "code_understanding", "understand-main"),
         ),
+        domain_agents=domain_agents,
         multi_agent=MultiAgentConfig(**multi_agent),
         promotion=PromotionConfig(**promotion),
     )

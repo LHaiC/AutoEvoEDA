@@ -11,6 +11,7 @@ from evoharness.artifacts import (
     append_event,
     append_history,
     collect_evaluator_results,
+    read_agent_memory,
     read_history,
     run_dir,
     run_id,
@@ -27,7 +28,7 @@ from evoharness.artifacts import (
     assert_not_paused,
     ensure_session,
 )
-from evoharness.config import EvoConfig, load_config
+from evoharness.config import DomainAgentConfig, EvoConfig, load_config
 from evoharness.human import review_candidate
 from evoharness.memory import append_lesson, render_prompt, render_repair_prompt
 from evoharness.workspace.git import Candidate, commit_candidate, create_candidate_worktree, git
@@ -54,6 +55,7 @@ def _record_decision(
     human_comment: str = "",
     next_hint: str = "",
     evaluator_results: dict[str, object] | None = None,
+    agent: str = "",
 ) -> dict[str, object]:
     record = {
         "cycle": candidate.cycle,
@@ -68,6 +70,7 @@ def _record_decision(
         "human_comment": human_comment,
         "next_hint": next_hint,
         "evaluator_results": evaluator_results or {},
+        "agent": agent,
     }
     append_history(repo, record)
     append_lesson(repo, cfg, record)
@@ -83,11 +86,13 @@ def _write_command_result(cycle_dir: Path, result: CommandResult) -> None:
     _write_text(cycle_dir / f"{result.name}.returncode", f"{result.returncode}\n")
 
 
-def _check_guard(candidate: Candidate, cfg: EvoConfig, cycle_dir: Path) -> GuardResult:
+def _check_guard(candidate: Candidate, cfg: EvoConfig, cycle_dir: Path, domain_agent: DomainAgentConfig | None = None) -> GuardResult:
+    allowed_paths = domain_agent.allowed_paths if domain_agent else cfg.guards.allowed_paths
+    forbidden_paths = [*cfg.guards.forbidden_paths, *(domain_agent.forbidden_paths if domain_agent else [])]
     guard = check_patch_scope(
         repo=candidate.path,
-        allowed_paths=cfg.guards.allowed_paths,
-        forbidden_paths=cfg.guards.forbidden_paths,
+        allowed_paths=allowed_paths,
+        forbidden_paths=forbidden_paths,
         max_changed_files=cfg.guards.max_changed_files,
         max_changed_lines=cfg.guards.max_changed_lines,
     )
@@ -142,6 +147,51 @@ def _role_prompt(repo: Path, cfg: EvoConfig, path: str) -> str:
     return render_prompt((repo / path).read_text(), repo, cfg) if path else ""
 
 
+def _select_domain_agent(cfg: EvoConfig, planner_stdout: str) -> DomainAgentConfig | None:
+    if not cfg.domain_agents:
+        return None
+    selected = [line.split(":", 1)[1].strip() for line in planner_stdout.splitlines() if line.lower().startswith("agent:")]
+    if len(selected) != 1:
+        raise ValueError("planner must emit exactly one line: agent: <domain-agent-name>")
+    matches = [agent for agent in cfg.domain_agents if agent.name == selected[0]]
+    if not matches:
+        raise ValueError(f"unknown domain agent selected by planner: {selected[0]}")
+    return matches[0]
+
+
+def _proposal(stdout: str) -> dict[str, str]:
+    keys = ["hypothesis", "target_files", "expected_metric_impact", "rollback_risk"]
+    values: dict[str, str] = {}
+    for line in stdout.splitlines():
+        name, sep, value = line.partition(":")
+        if sep and name.strip().lower() in keys:
+            values[name.strip().lower()] = value.strip()
+    missing = [key for key in keys if not values.get(key)]
+    if missing:
+        raise ValueError("agent proposal missing fields: " + ", ".join(missing))
+    return values
+
+
+def _write_agent_proposal(cycle_dir: Path, agent_name: str, proposal: dict[str, str]) -> None:
+    _write_text(cycle_dir / "agent_proposal.json", json.dumps({"agent": agent_name, **proposal}, indent=2, sort_keys=True) + "\n")
+    _write_text(
+        cycle_dir / "agent_proposal.md",
+        "\n".join([f"# Agent Proposal: {agent_name}", "", *[f"- {key}: {proposal[key]}" for key in sorted(proposal)], ""]),
+    )
+
+
+def _write_reproducibility(cycle_dir: Path, config_path: Path, repo: Path, candidate: Candidate, cfg: EvoConfig) -> None:
+    data = {
+        "config": str(config_path),
+        "project": cfg.project.name,
+        "champion_branch": cfg.project.champion_branch,
+        "project_head": git(["rev-parse", "HEAD"], cwd=repo),
+        "candidate_branch": candidate.branch,
+        "candidate_head": git(["rev-parse", "HEAD"], cwd=candidate.path),
+    }
+    _write_text(cycle_dir / "reproducibility.json", json.dumps(data, indent=2, sort_keys=True) + "\n")
+
+
 def run_one_cycle(
     config_path: Path,
     cfg: EvoConfig,
@@ -168,8 +218,12 @@ def run_one_cycle(
     agent = CodexBackend(sandbox=cfg.agent.sandbox)
 
     planner_notes = ""
+    domain_agent = None
     if cfg.multi_agent.planner and cfg.roles.planner_prompt:
         planner_prompt = _role_prompt(repo, cfg, cfg.roles.planner_prompt)
+        if cfg.domain_agents:
+            planner_prompt += "\n# Domain agent selection\nEmit exactly one line in this form:\nagent: <name>\nAvailable agents:\n"
+            planner_prompt += "\n".join(f"- {agent.name}" for agent in cfg.domain_agents) + "\n"
         planner = run_codex_role(repo, cfg.agents.planner, agent, planner_prompt, candidate.path, cfg.agent.timeout_s)
         _write_text(cycle_dir / "planner.stdout", planner.stdout)
         _write_text(cycle_dir / "planner.stderr", planner.stderr)
@@ -178,26 +232,47 @@ def run_one_cycle(
         if not planner.ok:
             return _record_decision(repo, run_id_value, candidate, "reject", "planner_failed", None, cfg)
         planner_notes = planner.stdout.strip()
+        try:
+            domain_agent = _select_domain_agent(cfg, planner.stdout)
+        except ValueError as exc:
+            return _record_decision(repo, run_id_value, candidate, "reject", f"planner_selection_failed:{exc}", None, cfg)
 
-    base_prompt = (repo / cfg.agent.prompt_file).read_text()
+    base_prompt = (repo / (domain_agent.prompt_file if domain_agent else cfg.agent.prompt_file)).read_text()
     prompt = render_prompt(base_prompt, repo, cfg)
+    if domain_agent:
+        prompt += "\n# Domain Agent\n"
+        prompt += f"name: {domain_agent.name}\n"
+        prompt += "allowed_paths:\n" + "\n".join(f"- {path}" for path in domain_agent.allowed_paths) + "\n"
+        prompt += "forbidden_paths:\n" + "\n".join(f"- {path}" for path in [*cfg.guards.forbidden_paths, *domain_agent.forbidden_paths]) + "\n"
+        agent_memory = read_agent_memory(repo, domain_agent.session_id)
+        if agent_memory:
+            prompt += "\n# Domain Agent Memory\n" + agent_memory + "\n"
+        prompt += "Before finishing, include these exact response fields:\n"
+        prompt += "hypothesis:\ntarget_files:\nexpected_metric_impact:\nrollback_risk:\n"
     if planner_notes:
         prompt += "\n# Planner Notes\n" + planner_notes + "\n"
     write_propose_doc(repo, run_id_value, prompt)
 
-    agent_result = run_codex_role(repo, cfg.agents.coder, agent, prompt, candidate.path, cfg.agent.timeout_s)
+    coder_role = domain_agent or cfg.agents.coder
+    agent_name = domain_agent.name if domain_agent else cfg.agents.coder.session_id
+    agent_result = run_codex_role(repo, coder_role, agent, prompt, candidate.path, cfg.agent.timeout_s)
     _write_text(cycle_dir / "codex.stdout", agent_result.stdout)
     _write_text(cycle_dir / "codex.stderr", agent_result.stderr)
-    write_agent_exchange(repo, cfg.agents.coder.session_id, prompt, agent_result.stdout, agent_result.stderr, agent_result.ok)
-    _event(repo, run_id_value, "agent_finished", candidate, {"agent_id": cfg.agents.coder.session_id, "ok": agent_result.ok})
+    write_agent_exchange(repo, coder_role.session_id, prompt, agent_result.stdout, agent_result.stderr, agent_result.ok)
+    _event(repo, run_id_value, "agent_finished", candidate, {"agent_id": coder_role.session_id, "agent": agent_name, "ok": agent_result.ok})
     if not agent_result.ok:
-        return _record_decision(repo, run_id_value, candidate, "reject", "agent_failed", None, cfg)
+        return _record_decision(repo, run_id_value, candidate, "reject", "agent_failed", None, cfg, agent=agent_name)
+    if domain_agent:
+        try:
+            _write_agent_proposal(cycle_dir, agent_name, _proposal(agent_result.stdout))
+        except ValueError as exc:
+            return _record_decision(repo, run_id_value, candidate, "reject", f"agent_proposal_failed:{exc}", None, cfg, agent=agent_name)
 
-    guard = _check_guard(candidate, cfg, cycle_dir)
+    guard = _check_guard(candidate, cfg, cycle_dir, domain_agent)
     write_implement_doc(repo, run_id_value, candidate, guard)
     _event(repo, run_id_value, "guard_finished", candidate, asdict(guard))
     if not guard.ok:
-        return _record_decision(repo, run_id_value, candidate, "reject", f"guard_failed:{guard.reason}", guard, cfg)
+        return _record_decision(repo, run_id_value, candidate, "reject", f"guard_failed:{guard.reason}", guard, cfg, agent=agent_name)
 
     if cfg.multi_agent.reviewer and cfg.roles.reviewer_prompt:
         review_prompt = _role_prompt(repo, cfg, cfg.roles.reviewer_prompt)
@@ -208,9 +283,10 @@ def run_one_cycle(
         write_agent_exchange(repo, cfg.agents.reviewer.session_id, review_prompt, review.stdout, review.stderr, review.ok)
         _event(repo, run_id_value, "reviewer_finished", candidate, {"ok": review.ok})
         if not review.ok:
-            return _record_decision(repo, run_id_value, candidate, "reject", "reviewer_failed", guard, cfg)
+            return _record_decision(repo, run_id_value, candidate, "reject", "reviewer_failed", guard, cfg, agent=agent_name)
 
     commit_candidate(candidate.path, cycle)
+    _write_reproducibility(cycle_dir, config_path, repo, candidate, cfg)
     passed, reason, failed_result, _results = _run_pipeline(candidate, cfg, cycle_dir, repo, run_id_value)
 
     repair_attempt = 0
@@ -223,17 +299,18 @@ def run_one_cycle(
         write_agent_exchange(repo, cfg.agents.repair.session_id, repair_prompt, repair.stdout, repair.stderr, repair.ok)
         _event(repo, run_id_value, "agent_finished", candidate, {"agent_id": cfg.agents.repair.session_id, "repair_attempt": repair_attempt, "ok": repair.ok})
         if not repair.ok:
-            return _record_decision(repo, run_id_value, candidate, "reject", "repair_agent_failed", guard, cfg)
-        guard = _check_guard(candidate, cfg, cycle_dir)
+            return _record_decision(repo, run_id_value, candidate, "reject", "repair_agent_failed", guard, cfg, agent=agent_name)
+        guard = _check_guard(candidate, cfg, cycle_dir, domain_agent)
         write_implement_doc(repo, run_id_value, candidate, guard)
         _event(repo, run_id_value, "guard_finished", candidate, asdict(guard))
         if not guard.ok:
-            return _record_decision(repo, run_id_value, candidate, "reject", f"guard_failed:{guard.reason}", guard, cfg)
+            return _record_decision(repo, run_id_value, candidate, "reject", f"guard_failed:{guard.reason}", guard, cfg, agent=agent_name)
         commit_candidate(candidate.path, cycle)
+        _write_reproducibility(cycle_dir, config_path, repo, candidate, cfg)
         passed, reason, failed_result, _results = _run_pipeline(candidate, cfg, cycle_dir, repo, run_id_value)
 
     if not passed:
-        return _record_decision(repo, run_id_value, candidate, "reject", reason, guard, cfg)
+        return _record_decision(repo, run_id_value, candidate, "reject", reason, guard, cfg, agent=agent_name)
 
     evaluator_snapshot = _collect_evaluator_snapshot(candidate, cfg, repo, run_id_value)
     if not evaluator_snapshot.ok:
@@ -246,6 +323,7 @@ def run_one_cycle(
             guard,
             cfg,
             evaluator_results=evaluator_snapshot.data,
+            agent=agent_name,
         )
 
     if human_review or cfg.human.review_on_accept:
@@ -268,6 +346,7 @@ def run_one_cycle(
             human_decision.comment,
             human_decision.next_hint,
             evaluator_snapshot.data,
+            agent=agent_name,
         )
 
     return _record_decision(
@@ -279,6 +358,7 @@ def run_one_cycle(
         guard,
         cfg,
         evaluator_results=evaluator_snapshot.data,
+        agent=agent_name,
     )
 
 

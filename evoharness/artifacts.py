@@ -271,6 +271,8 @@ def write_decision_doc(repo: Path, value: str, record: dict[str, Any]) -> None:
         lines.append(f"- Human comment: {record['human_comment']}")
     if record.get("next_hint"):
         lines.append(f"- Next hint: {record['next_hint']}")
+    if record.get("agent"):
+        lines.append(f"- Agent: `{record['agent']}`")
     evaluator_results = record.get("evaluator_results", {})
     if isinstance(evaluator_results, dict) and evaluator_results:
         lines.extend(["", "## Evaluator Results", "", *[f"- `{name}`" for name in sorted(evaluator_results)]])
@@ -326,6 +328,7 @@ def write_cycle_summary(repo: Path, record: dict[str, Any]) -> Path:
                 f"- Reason: `{record['reason']}`",
                 f"- Changed files: {record['changed_files']}",
                 f"- Changed lines: {record['changed_lines']}",
+                f"- Agent: `{record.get('agent', '')}`",
                 f"- Evaluator results: {result_keys}",
                 "",
                 "## Artifacts",

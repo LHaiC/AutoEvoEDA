@@ -35,6 +35,57 @@ result_files:
 
 These files are adapter-owned. For ABC-style work, `correctness.json` can summarize equivalence checks, `qor.json` can store area/depth/runtime deltas, and `reward.json` can store the final scalar or gate decision.
 
+## Paper Fidelity Status
+
+`evo-harness` implements the reusable outer loop from arXiv:2604.15082v1: Codex invocation, candidate worktrees, patch guards, event logs, run directories, phase documents, human comments, memory injection, local GUI inspection/control, rule proposals, and explicit promotion.
+
+It does not yet reproduce the full paper system. The paper is an ABC-specific multi-agent self-evolution system with cycle-0 knowledge bootstrapping, a global planning agent, three domain-specialized coding agents, formal equivalence checking, large-scale QoR evaluation, and a self-evolving rulebase. This repository is currently the framework shell that an ABC adapter can use to build toward that system.
+
+## Current Agent Model
+
+The current framework defines six role identities:
+
+```text
+planner
+coder
+reviewer
+repair
+rulebase
+code_understanding
+```
+
+Their current behavior is:
+
+```text
+planner:
+  Optional. Runs before coder when multi_agent.planner is true.
+  Writes planner.stdout and appends planner notes into the coder prompt.
+
+coder:
+  Required for each candidate. Calls Codex to edit the candidate worktree.
+
+reviewer:
+  Optional. Runs after patch guard and before evaluator gates when multi_agent.reviewer is true.
+  Advisory only; project scripts still decide correctness and performance.
+
+repair:
+  Optional. Runs after a failed gate when repair.enabled is true.
+  Receives the failed gate stdout/stderr and attempts a bounded fix.
+
+rulebase:
+  Reserved role identity for rule evolution.
+  Today, rule proposals are file-backed and human-approved, not autonomous.
+
+code_understanding:
+  Optional. Runs through evo understand --agent to enrich deterministic code memory.
+```
+
+This differs from the paper. The paper uses a global planning agent plus three ABC domain coding agents: Flow Agent, Mapper Agent, and Logic Minimization Agent. Those agents operate on distinct ABC subsystems and are coordinated through a shared evolving rulebase and a unified correctness/QoR pipeline. `evo-harness` now supports configurable domain-agent identities, but it does not ship ABC-specific Flow/Mapper/Logic prompts, scopes, or adapter scripts.
+
+## Paper-Fidelity TODO
+
+The detailed paper-fidelity checklist lives in `todo.md`. ABC build, CEC, benchmark, QoR, and reward scripts are adapter-owned; the framework keeps placeholders in `examples/abc/` and focuses on reusable orchestration, agent roles, guards, memory, events, and artifact contracts.
+
 ## Long-Running Controls
 
 Enable memory in `evo.yaml` to inject project memory, recent lessons, rejected ideas, accepted patterns, and patch scope into the Codex prompt. Lessons are appended to `.evo/memory/lessons.jsonl` after each cycle.
@@ -96,7 +147,7 @@ repair:
   prompt_file: prompts/repair.md
 ```
 
-Role prompt files can align the run with planner/coder/reviewer guidance without creating multiple agents:
+Role prompt files can align the run with planner/coder/reviewer guidance:
 
 ```yaml
 multi_agent:
@@ -111,6 +162,25 @@ rulebase:
 ```
 
 When enabled, the planner writes `planner.stdout` before coding and its notes are appended to the coder prompt. The reviewer writes `reviewer.stdout` after patch guards and before evaluator gates; evaluators still decide correctness and performance.
+
+Paper-style domain agents are optional. When `domain_agents` is non-empty, planner must emit exactly one line `agent: <name>`; the selected agent gets its own prompt, session id, memory, allowed paths, forbidden paths, guard scope, and required proposal fields:
+
+```yaml
+multi_agent:
+  planner: true
+roles:
+  planner_prompt: prompts/planner.md
+domain_agents:
+  - name: mapper
+    session_id: mapper-main
+    prompt_file: prompts/mapper.md
+    allowed_paths:
+      - src/map/mapper/
+    forbidden_paths:
+      - src/map/mapper/golden/
+```
+
+Domain-agent Codex responses must include `hypothesis:`, `target_files:`, `expected_metric_impact:`, and `rollback_risk:`. The harness stores them as `agent_proposal.json` and `agent_proposal.md` under the run directory.
 
 Run small candidate pools with explicit budgets:
 

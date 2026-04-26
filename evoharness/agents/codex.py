@@ -5,7 +5,7 @@ from pathlib import Path
 import subprocess
 
 from evoharness.artifacts import read_codex_session, write_codex_session_event
-from evoharness.config import AgentRoleConfig
+from evoharness.config import AgentRoleConfig, DomainAgentConfig
 
 
 @dataclass(frozen=True)
@@ -39,7 +39,7 @@ class CodexBackend:
 
 def run_codex_role(
     repo: Path,
-    role: AgentRoleConfig,
+    role: AgentRoleConfig | DomainAgentConfig,
     agent: CodexBackend,
     prompt: str,
     cwd: Path,
