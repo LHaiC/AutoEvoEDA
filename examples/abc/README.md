@@ -213,6 +213,14 @@ budget:
 
 Each candidate receives its own branch and worktree, such as `evo/cycle-001-cand-002`.
 
+Compare a pool after evaluation:
+
+```bash
+evo compare --config evo.yaml --cycle 1
+```
+
+This writes `.evo/reports/compare-cycle-001.md` and does not promote any branch.
+
 ## Long-Running Daemon
 
 Use the daemon when you want a local main loop that can be steered from another shell:

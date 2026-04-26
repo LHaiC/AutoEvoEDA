@@ -122,6 +122,14 @@ budget:
 
 Each candidate still runs the same deterministic guards and project scripts.
 
+Compare pooled candidates without promoting:
+
+```bash
+evo compare --config examples/abc/evo.yaml --cycle 1
+```
+
+The report is written to `.evo/reports/compare-cycle-001.md` and recommends the highest numeric `evaluator_results.reward.score` when present.
+
 ## Run Artifacts
 
 Each candidate writes an event stream and phase documents under `.evo/runs/<run_id>/`:

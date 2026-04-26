@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import argparse
 
+from evoharness.compare import compare_cycle
 from evoharness.config import load_config
 from evoharness.daemon import run_daemon
 from evoharness.gui import serve_gui
@@ -45,6 +46,9 @@ def build_parser() -> argparse.ArgumentParser:
     config = subparsers.add_parser("config", help="validate evo.yaml")
     config.add_argument("action", choices=["validate"])
     config.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
+    compare = subparsers.add_parser("compare", help="summarize candidates from one cycle")
+    compare.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
+    compare.add_argument("--cycle", type=int, required=True)
     session = subparsers.add_parser("session", help="inspect or steer a local evolution session")
     session.add_argument("action", choices=["status", "comment", "pause", "resume"])
     session.add_argument("text", nargs="*")
@@ -104,6 +108,8 @@ def main() -> None:
     if args.command == "config":
         load_config(args.config)
         print(f"ok: {args.config}")
+    if args.command == "compare":
+        print(compare_cycle(args.config, args.cycle))
     if args.command == "session":
         if args.action == "status":
             print(session_status(args.config))
