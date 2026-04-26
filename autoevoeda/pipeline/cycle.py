@@ -38,10 +38,11 @@ from autoevoeda.workspace.git import Candidate, commit_candidate, create_candida
 from autoevoeda.workspace.guard import GuardResult, check_candidate_scope
 
 
-def _pipeline_env(repo: Path, candidate: Candidate) -> dict[str, str]:
+def _pipeline_env(repo: Path, candidate: Candidate, cfg: EvoConfig) -> dict[str, str]:
     return {
         "AUTOEVO_ADAPTER_ROOT": str(repo),
         "AUTOEVO_CANDIDATE_ROOT": str(candidate.path),
+        "AUTOEVO_RUNNER_SANDBOX": cfg.runner.sandbox,
     }
 
 
@@ -137,6 +138,16 @@ def _check_guard(candidate: Candidate, cfg: EvoConfig, cycle_dir: Path, domain_a
 
 def _run_pipeline(candidate: Candidate, cfg: EvoConfig, cycle_dir: Path, repo: Path, run_id_value: str) -> tuple[bool, str, CommandResult | None, list[CommandResult]]:
     results = []
+    env = _pipeline_env(repo, candidate, cfg)
+    if cfg.runner.preflight:
+        result = run_cmd(name="runner_preflight", cmd=cfg.runner.preflight, cwd=candidate.path, env=env)
+        _checkpoint(repo, run_id_value, "runner_preflight_finished", candidate)
+        results.append(result)
+        _write_command_result(cycle_dir, result)
+        _event(repo, run_id_value, "runner_preflight_finished", candidate, {"ok": result.ok, "returncode": result.returncode, "runner_sandbox": cfg.runner.sandbox})
+        if not result.ok:
+            write_benchmark_doc(repo, run_id_value, results)
+            return False, "runner_preflight_failed", result, results
     for name, cmd in [
         ("build", cfg.pipeline.build),
         ("regression", cfg.pipeline.regression),
@@ -144,7 +155,7 @@ def _run_pipeline(candidate: Candidate, cfg: EvoConfig, cycle_dir: Path, repo: P
         ("perf", cfg.pipeline.perf),
         ("reward", cfg.pipeline.reward),
     ]:
-        result = run_cmd(name=name, cmd=cmd, cwd=candidate.path, env=_pipeline_env(repo, candidate))
+        result = run_cmd(name=name, cmd=cmd, cwd=candidate.path, env=env)
         _checkpoint(repo, run_id_value, f"{name}_finished", candidate)
         results.append(result)
         _write_command_result(cycle_dir, result)
@@ -237,6 +248,7 @@ def _write_reproducibility(cycle_dir: Path, config_path: Path, repo: Path, candi
         "candidate_branch": candidate.branch,
         "candidate_head": _candidate_head(candidate),
         "candidate_repos": {repo.name: {"branch": repo.branch, "head": git(["rev-parse", "HEAD"], cwd=repo.path)} for repo in candidate.repos},
+        "runner_sandbox": cfg.runner.sandbox,
     }
     _write_text(cycle_dir / "reproducibility.json", json.dumps(data, indent=2, sort_keys=True) + "\n")
 
@@ -315,6 +327,7 @@ def run_one_cycle(
         prompt += "\n# Candidate Workspace\n"
         prompt += f"AUTOEVO_ADAPTER_ROOT={repo}\n"
         prompt += f"AUTOEVO_CANDIDATE_ROOT={candidate.path}\n"
+        prompt += f"AUTOEVO_RUNNER_SANDBOX={cfg.runner.sandbox}\n"
         prompt += "Repos:\n" + "\n".join(f"- {item.name}: {item.path}" for item in candidate.repos) + "\n"
     if planner_notes:
         prompt += "\n# Planner Notes\n" + planner_notes + "\n"
@@ -361,7 +374,7 @@ def run_one_cycle(
     passed, reason, failed_result, _results = _run_pipeline(candidate, cfg, cycle_dir, repo, run_id_value)
 
     repair_attempt = 0
-    while not passed and cfg.repair.enabled and failed_result and repair_attempt < cfg.repair.max_attempts:
+    while not passed and reason != "runner_preflight_failed" and cfg.repair.enabled and failed_result and repair_attempt < cfg.repair.max_attempts:
         repair_attempt += 1
         repair_prompt = _repair_prompt(repo, cfg, reason, failed_result)
         repair = run_codex_role(repo, cfg.agents.repair, agent, repair_prompt, candidate.path, cfg.agent.timeout_s)

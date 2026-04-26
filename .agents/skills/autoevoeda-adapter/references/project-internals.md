@@ -5,7 +5,7 @@ Read this before editing the AutoEvoEDA framework code. Keep framework changes s
 ## Package Map
 
 - `autoevoeda/cli.py`: CLI parser and command dispatch. Add new user commands here only after implementing behavior elsewhere.
-- `autoevoeda/config.py`: strict `evo.yaml` schema dataclasses and `load_config()`. Add fields here first when changing config shape.
+- `autoevoeda/config.py`: strict `evo.yaml` schema dataclasses and `load_config()`. Add fields here first when changing config shape, including runner contracts.
 - `autoevoeda/pipeline/cycle.py`: candidate lifecycle and accept/reject control flow. Owns planner, domain-agent selection, coder, guard, reviewer, commit, pipeline gates, repair, evaluator snapshot, human review, checkpoint, and abandon-active sequencing.
 - `autoevoeda/artifacts.py`: `.evo/` artifact APIs. Owns run directories, events, history, phase docs, reports, session state, active-run marker, agent registry, rule proposals, promotion, compare, and worktree cleanup helpers.
 - `autoevoeda/agents/codex.py`: Codex CLI subprocess backend and optional native resume call path.
@@ -28,6 +28,7 @@ evo CLI
   -> patch guard checks allowed/forbidden paths and size
   -> optional reviewer advisory pass
   -> commit candidate branch
+  -> optional runner preflight
   -> build, regression, compare_regression, perf, reward scripts
   -> collect result_files JSON objects
   -> optional human review
@@ -52,7 +53,7 @@ Promotion is separate: `evo promote` fast-forwards the configured champion branc
 
 ```text
 project, agent, workspace, guards, pipeline, result_files, memory, human,
-repair, roles, rulebase, pool, budget, agents, domain_agents, multi_agent,
+repair, roles, rulebase, pool, budget, agents, domain_agents, multi_agent, runner,
 promotion
 ```
 
@@ -77,6 +78,7 @@ Domain-agent Codex output must include `hypothesis:`, `target_files:`, `expected
 - Keep promotion explicit; accept/keep records do not merge into champion automatically.
 - Keep interrupted-run handling explicit; active checkpoints block new scheduling until abandoned.
 - Keep evaluator scripts, benchmark data, golden outputs, CI, and config outside candidate edit scope by default.
+- Treat `runner.sandbox` as an evaluator environment contract, not a privilege escalation mechanism from a restricted parent process.
 - Avoid broad fallback behavior. Prefer deterministic failure with a clear reason.
 
 ## Verification For Framework Edits

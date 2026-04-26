@@ -46,6 +46,7 @@ Read `references/evo-yaml.md`. For sibling-repo workspaces, also read `reference
 
 - `guards.allowed_paths` contains implementation scopes only.
 - `guards.forbidden_paths` includes evaluator scripts, config, generated results, benchmark/golden assets, and CI.
+- `agent.sandbox` is for Codex code editing; `runner.sandbox` is for evaluator/pipeline requirements and should be paired with `runner.preflight` for CUDA-only runs.
 - `domain_agents` requires `multi_agent.planner: true` and `roles.planner_prompt`.
 - Stable `session_id` values are framework-level memory identities; native Codex resume is opt-in.
 

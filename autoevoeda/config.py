@@ -64,6 +64,12 @@ class PipelineConfig:
 
 
 @dataclass(frozen=True)
+class RunnerConfig:
+    sandbox: str
+    preflight: str
+
+
+@dataclass(frozen=True)
 class ResultFilesConfig:
     correctness: str
     qor: str
@@ -169,6 +175,7 @@ class EvoConfig:
     workspace: WorkspaceConfig
     guards: GuardConfig
     pipeline: PipelineConfig
+    runner: RunnerConfig
     result_files: ResultFilesConfig
     memory: MemoryConfig
     human: HumanConfig
@@ -287,6 +294,13 @@ def _workspace(data: dict[str, Any], project: dict[str, Any]) -> WorkspaceConfig
     )
 
 
+def _runner(data: dict[str, Any]) -> RunnerConfig:
+    raw = {"sandbox": "workspace-write", "preflight": "", **_optional_section(data, "runner")}
+    if raw["sandbox"] not in {"workspace-write", "danger-full-access", "host"}:
+        raise ValueError("runner.sandbox must be workspace-write, danger-full-access, or host")
+    return RunnerConfig(**raw)
+
+
 def load_config(path: Path) -> EvoConfig:
     data = yaml.safe_load(path.read_text())
     if not isinstance(data, dict):
@@ -333,6 +347,7 @@ def load_config(path: Path) -> EvoConfig:
         workspace=workspace,
         guards=GuardConfig(**_section(data, "guards")),
         pipeline=PipelineConfig(**_section(data, "pipeline")),
+        runner=_runner(data),
         result_files=ResultFilesConfig(**result_files),
         memory=MemoryConfig(**memory),
         human=HumanConfig(**human),

@@ -44,7 +44,7 @@ ask Codex to use the repo-level Skill when adapting a project, installing AutoEv
 Use $autoevoeda-adapter to create or update an AutoEvoEDA adapter for this project, then show me the install and run commands.
 ```
 
-The Skill explains the expected workspace layout, `evo.yaml`, adapter scripts, memory files, single-repo or multi-repo worktrees, and `evo` commands.
+The Skill explains the expected workspace layout, `evo.yaml`, adapter scripts, memory files, single-repo or multi-repo worktrees, runner preflights, and `evo` commands.
 
 ### Manual:
 

@@ -15,6 +15,10 @@ agent:
   timeout_s: 3600
   sandbox: workspace-write
 
+runner:
+  sandbox: workspace-write
+  preflight: ""
+
 workspace:
   mode: single_repo
   worktree_root: ../.evo-worktrees
@@ -103,6 +107,10 @@ agents:
 ## Multi-Repo Workspaces
 
 For sibling git repositories, use `workspace.mode: multi_repo`; see `multi-repo-workspace.md`. In that mode, `workspace.repos[*].allowed_paths` are local to each child repo and `guards.allowed_paths` should use candidate-root paths such as `mapper/src/`.
+
+## Runner Contract
+
+`agent.sandbox` controls the Codex code-editing agent. `runner.sandbox` describes the expected evaluator/pipeline environment and is recorded in artifacts; it cannot escape a restricted parent process. Use `runner.sandbox: danger-full-access` with a `runner.preflight` command when CUDA-only benchmark scripts need host NVIDIA device access.
 
 ## Domain Agents
 

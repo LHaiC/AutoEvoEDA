@@ -119,6 +119,18 @@ pipeline:
 
 Pipeline commands run with `cwd=$AUTOEVO_CANDIDATE_ROOT` and receive `AUTOEVO_ADAPTER_ROOT` and `AUTOEVO_CANDIDATE_ROOT` in the environment. Promotion fast-forwards each changed child repo into its configured champion branch. See `examples/multi_repo/`.
 
+Use `runner` to document and enforce evaluator preflight requirements separately from the code-editing Codex agent:
+
+```yaml
+agent:
+  sandbox: workspace-write
+runner:
+  sandbox: danger-full-access
+  preflight: bash "$AUTOEVO_ADAPTER_ROOT/scripts/cuda_preflight.sh"
+```
+
+`runner.sandbox` is a requirement label recorded in artifacts and exposed as `AUTOEVO_RUNNER_SANDBOX`; it does not grant privileges if the parent `evo run` process is already sandboxed. For CUDA-only benchmark adapters, make CUDA a pipeline preflight instead of a code-agent permission issue. Golden generation, regression, and performance scripts should call a hard `require_cuda` check before running benchmarks and must not fall back to CPU. If AutoEvoEDA is launched from a sandbox that hides `/dev/nvidia*` or driver libraries, run the evaluator/benchmark process in a full-access environment while keeping the code-editing Codex agent scoped by guards.
+
 ## Long-Running Controls
 
 Enable memory in `evo.yaml` to inject project memory, recent lessons, rejected ideas, accepted patterns, and patch scope into the Codex prompt. Lessons are appended to `.evo/memory/lessons.jsonl` after each cycle.

@@ -9,6 +9,10 @@ agent:
   timeout_s: 3600
   sandbox: workspace-write
 
+runner:
+  sandbox: danger-full-access
+  preflight: bash "$AUTOEVO_ADAPTER_ROOT/scripts/cuda_preflight.sh"
+
 workspace:
   mode: multi_repo
   source_root: ../source-workspace
