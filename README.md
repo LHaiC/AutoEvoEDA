@@ -168,7 +168,7 @@ evo understand --config examples/abc/evo.yaml --module src/map/ --changed-only
 
 This writes deterministic memory under `.evo/memory/code/`, including module summaries, invariants, extension points, and workflow notes for build, regression, benchmark, and reward commands. Use `--agent` to ask Codex to enrich `.evo/memory/code/agent_notes.md` while preserving deterministic memory as the baseline.
 
-## Read-Only GUI
+## Local GUI
 
 Serve a local dashboard over `.evo` artifacts:
 
@@ -214,11 +214,9 @@ agents:
     codex_session:
       enabled: true
       session_file: .evo/agents/coder-main/codex_session.txt
-      on_missing: new
-      on_resume_failure: new
 ```
 
-When a session id exists, the harness tries `codex exec resume`. If it is missing or resume fails and the policy is `new`, the role starts a new Codex invocation and records the event under `.evo/agents/<agent_id>/codex_session_events.jsonl`.
+When `session_file` contains a session id, the harness runs `codex exec resume`; otherwise it starts a new Codex invocation. Resume failures are recorded and fail that agent call.
 
 ## Rulebase Loop
 

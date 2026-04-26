@@ -271,8 +271,6 @@ agents:
     codex_session:
       enabled: true
       session_file: .evo/agents/coder-main/codex_session.txt
-      on_missing: new
-      on_resume_failure: new
 ```
 
 The framework-level memory files remain the durable context. Native Codex resume is an optimization for continuity, not a correctness requirement.

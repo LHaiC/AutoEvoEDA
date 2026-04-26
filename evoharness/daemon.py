@@ -5,11 +5,9 @@ import json
 import os
 import time
 
+from evoharness.artifacts import append_event, ensure_session, read_history, read_state, write_project_indexes
 from evoharness.config import EvoConfig, load_config
-from evoharness.events import append_event
 from evoharness.pipeline.cycle import run_one_cycle
-from evoharness.reports import write_project_indexes
-from evoharness.session import ensure_session, read_state
 
 
 def _repo(config_path: Path, cfg: EvoConfig) -> Path:
@@ -17,15 +15,7 @@ def _repo(config_path: Path, cfg: EvoConfig) -> Path:
 
 
 def _next_cycle(repo: Path) -> int:
-    history = repo / ".evo" / "history.jsonl"
-    if not history.exists():
-        return 1
-    cycles = []
-    for line in history.read_text().splitlines():
-        if line.strip():
-            record = json.loads(line)
-            if "decision" in record and "cycle" in record:
-                cycles.append(int(record["cycle"]))
+    cycles = [int(record["cycle"]) for record in read_history(repo) if "decision" in record and "cycle" in record]
     return max(cycles, default=0) + 1
 
 
@@ -34,13 +24,8 @@ def _lock(repo: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         pid = int(path.read_text())
-        if pid > 0:
-            try:
-                os.kill(pid, 0)
-            except ProcessLookupError:
-                pass
-            else:
-                raise RuntimeError(f"daemon already running with pid {pid}")
+        if pid > 0 and Path(f"/proc/{pid}").exists():
+            raise RuntimeError(f"daemon already running with pid {pid}")
     path.write_text(f"{os.getpid()}\n")
     return path
 

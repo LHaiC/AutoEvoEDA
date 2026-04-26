@@ -4,12 +4,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 import re
 
-from evoharness.agent_state import read_agent_memory, write_agent_exchange
-from evoharness.agents.codex import CodexBackend
-from evoharness.agents.session import run_codex_role
+from evoharness.agents.codex import CodexBackend, run_codex_role
+from evoharness.artifacts import append_event, read_agent_memory, write_agent_exchange, write_project_indexes
 from evoharness.config import EvoConfig, load_config
-from evoharness.events import append_event
-from evoharness.reports import write_project_indexes
 from evoharness.workspace.git import git
 
 

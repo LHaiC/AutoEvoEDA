@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-import json
 import subprocess
-import time
+
+from evoharness.artifacts import read_codex_session, write_codex_session_event
+from evoharness.config import AgentRoleConfig
 
 
 @dataclass(frozen=True)
@@ -12,7 +13,6 @@ class AgentResult:
     ok: bool
     stdout: str
     stderr: str
-    session_id: str = ""
     session_mode: str = "new"
 
 
@@ -20,73 +20,34 @@ class CodexBackend:
     def __init__(self, sandbox: str = "workspace-write") -> None:
         self.sandbox = sandbox
 
-    def _run_new(self, prompt: str, cwd: Path, timeout_s: int, since: float) -> AgentResult:
+    def run(self, prompt: str, cwd: Path, timeout_s: int, session_id: str = "") -> AgentResult:
+        cmd = ["codex", "exec", "--full-auto", "--sandbox", self.sandbox, prompt]
+        mode = "new"
+        if session_id:
+            cmd = ["codex", "exec", "resume", "--full-auto", session_id, prompt]
+            mode = "resume"
         proc = subprocess.run(
-            ["codex", "exec", "--full-auto", "--sandbox", self.sandbox, prompt],
+            cmd,
             cwd=cwd,
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=timeout_s,
         )
-        return AgentResult(
-            ok=proc.returncode == 0,
-            stdout=proc.stdout,
-            stderr=proc.stderr,
-            session_id=_latest_session_id(cwd, since),
-            session_mode="new",
-        )
-
-    def run(
-        self,
-        prompt: str,
-        cwd: Path,
-        timeout_s: int,
-        session_id: str = "",
-        on_resume_failure: str = "new",
-    ) -> AgentResult:
-        since = time.time()
-        if not session_id:
-            return self._run_new(prompt, cwd, timeout_s, since)
-
-        proc = subprocess.run(
-            ["codex", "exec", "resume", "--full-auto", session_id, prompt],
-            cwd=cwd,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=timeout_s,
-        )
-        if proc.returncode == 0 or on_resume_failure == "fail":
-            return AgentResult(
-                ok=proc.returncode == 0,
-                stdout=proc.stdout,
-                stderr=proc.stderr,
-                session_id=session_id,
-                session_mode="resume",
-            )
-        fresh = self._run_new(prompt, cwd, timeout_s, since)
-        return AgentResult(
-            ok=fresh.ok,
-            stdout=fresh.stdout,
-            stderr=(proc.stderr + "\n" + fresh.stderr).strip(),
-            session_id=fresh.session_id,
-            session_mode="new_after_resume_failure",
-        )
+        return AgentResult(ok=proc.returncode == 0, stdout=proc.stdout, stderr=proc.stderr, session_mode=mode)
 
 
-def _latest_session_id(cwd: Path, since: float) -> str:
-    sessions = Path.home() / ".codex" / "sessions"
-    if not sessions.exists():
-        return ""
-    recent = [path for path in sessions.rglob("*.jsonl") if path.stat().st_mtime >= since - 1]
-    files = sorted(recent, key=lambda path: path.stat().st_mtime, reverse=True)
-    for path in files[:20]:
-        try:
-            first = path.read_text().splitlines()[0]
-            payload = json.loads(first).get("payload", {})
-        except (IndexError, OSError, json.JSONDecodeError):
-            continue
-        if payload.get("cwd") == str(cwd):
-            return str(payload.get("id", ""))
-    return ""
+def run_codex_role(
+    repo: Path,
+    role: AgentRoleConfig,
+    agent: CodexBackend,
+    prompt: str,
+    cwd: Path,
+    timeout_s: int,
+) -> AgentResult:
+    cfg = role.codex_session
+    session_id = read_codex_session(repo, role.session_id, cfg.session_file) if cfg.enabled else ""
+    result = agent.run(prompt, cwd, timeout_s, session_id)
+    if cfg.enabled:
+        write_codex_session_event(repo, role.session_id, result.session_mode, {"ok": result.ok, "session_id": session_id})
+    return result

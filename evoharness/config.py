@@ -90,8 +90,6 @@ class RulebaseConfig:
 class CodexSessionConfig:
     enabled: bool
     session_file: str
-    on_missing: str
-    on_resume_failure: str
 
 
 @dataclass(frozen=True)
@@ -130,8 +128,6 @@ class BudgetConfig:
 
 @dataclass(frozen=True)
 class PromotionConfig:
-    mode: str
-    allow_auto_after_human_accept: bool
     require_clean_champion: bool
 
 
@@ -181,13 +177,8 @@ def _agent_role(data: dict[str, Any], name: str, default_session_id: str) -> Age
     codex_session = {
         "enabled": False,
         "session_file": f".evo/agents/{session_id}/codex_session.txt",
-        "on_missing": "new",
-        "on_resume_failure": "new",
         **codex_data,
     }
-    for key in ["on_missing", "on_resume_failure"]:
-        if codex_session[key] not in {"new", "fail"}:
-            raise ValueError(f"agents.{name}.codex_session.{key} must be 'new' or 'fail'")
     role = {key: value for key, value in raw.items() if key not in {"session_id", "codex_session"}}
     return AgentRoleConfig(**role, session_id=session_id, codex_session=CodexSessionConfig(**codex_session))
 
@@ -214,14 +205,7 @@ def load_config(path: Path) -> EvoConfig:
     pool = {"enabled": False, "size": 1, **_optional_section(data, "pool")}
     budget = {"max_cycles": 0, "max_candidates": 0, **_optional_section(data, "budget")}
     multi_agent = {"planner": False, "reviewer": False, **_optional_section(data, "multi_agent")}
-    promotion = {
-        "mode": "manual",
-        "allow_auto_after_human_accept": False,
-        "require_clean_champion": True,
-        **_optional_section(data, "promotion"),
-    }
-    if promotion["mode"] != "manual":
-        raise ValueError("promotion.mode must be 'manual'")
+    promotion = {"require_clean_champion": True, **_optional_section(data, "promotion")}
     result_files = {
         "correctness": "results/correctness.json",
         "qor": "results/qor.json",

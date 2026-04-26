@@ -80,8 +80,6 @@ budget:
   max_candidates: 0
 
 promotion:
-  mode: manual
-  allow_auto_after_human_accept: false
   require_clean_champion: true
 
 agents:
@@ -92,8 +90,6 @@ agents:
     codex_session:
       enabled: false
       session_file: .evo/agents/coder-main/codex_session.txt
-      on_missing: new
-      on_resume_failure: new
   reviewer:
     session_id: reviewer-main
   repair:
@@ -105,5 +101,3 @@ agents:
     codex_session:
       enabled: false
       session_file: .evo/agents/understand-main/codex_session.txt
-      on_missing: new
-      on_resume_failure: new

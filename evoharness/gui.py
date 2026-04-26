@@ -8,8 +8,7 @@ import json
 from urllib.parse import parse_qs
 
 from evoharness.config import load_config
-from evoharness.promote import promote_cycle
-from evoharness.session import add_session_comment, set_session_status
+from evoharness.artifacts import add_session_comment, promote_cycle, set_session_status
 
 
 def _repo(config_path: Path) -> Path:
@@ -85,7 +84,7 @@ a {{ color: #0f5f8f; }}
 </head>
 <body>
 <h1>evo-harness dashboard</h1>
-<p>Read-only local view for <code>{escape(str(repo))}</code></p>
+<p>Local control view for <code>{escape(str(repo))}</code></p>
 <section><h2>Workflow</h2>{_workflow_graph()}</section>
 <section><h2>Controls</h2>
 <form method="post" action="/action/comment"><input name="text" placeholder="human steering comment" size="80"> <button>Comment</button></form>

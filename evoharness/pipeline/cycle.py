@@ -4,23 +4,32 @@ from dataclasses import asdict
 from pathlib import Path
 import json
 
-from evoharness.agent_state import write_agent_exchange
-from evoharness.agents.codex import CodexBackend
-from evoharness.agents.session import run_codex_role
-from evoharness.config import EvoConfig, load_config
-from evoharness.events import append_event, run_dir, run_id
-from evoharness.evaluator_results import (
+from evoharness.agents.codex import CodexBackend, run_codex_role
+from evoharness.artifacts import (
     EvaluatorSnapshot,
+    CommandResult,
+    append_event,
+    append_history,
     collect_evaluator_results,
+    read_history,
+    run_dir,
+    run_id,
+    write_benchmark_doc,
+    write_context_doc,
+    write_cycle_summary,
+    write_decision_doc,
     write_evaluator_results,
+    write_implement_doc,
+    write_project_indexes,
+    write_propose_doc,
+    run_cmd,
+    write_agent_exchange,
+    assert_not_paused,
+    ensure_session,
 )
+from evoharness.config import EvoConfig, load_config
 from evoharness.human import review_candidate
 from evoharness.memory import append_lesson, render_prompt, render_repair_prompt
-from evoharness.phase_docs import write_benchmark_doc, write_context_doc, write_decision_doc, write_implement_doc, write_propose_doc
-from evoharness.pipeline.runner import CommandResult, run_cmd
-from evoharness.reports import write_cycle_summary, write_project_indexes
-from evoharness.session import assert_not_paused, ensure_session
-from evoharness.state import append_history
 from evoharness.workspace.git import Candidate, commit_candidate, create_candidate_worktree, git
 from evoharness.workspace.guard import GuardResult, check_patch_scope
 
@@ -281,12 +290,15 @@ def run_cycles(config_path: Path, cycles: int, human_review: bool = False) -> No
     repo = (config_path.parent / cfg.project.repo).resolve()
     ensure_session(repo)
     write_project_indexes(repo)
+    history = [record for record in read_history(repo) if "decision" in record and "cycle" in record]
+    completed_cycles = max([int(record["cycle"]) for record in history], default=0)
+    completed_candidates = len(history)
     pool_size = cfg.pool.size if cfg.pool.enabled else 1
-    max_cycles = cfg.budget.max_cycles if cfg.budget.max_cycles > 0 else cycles
-    stop_cycles = min(cycles, max_cycles)
-    for cycle in range(1, stop_cycles + 1):
+    remaining_cycles = cfg.budget.max_cycles - completed_cycles if cfg.budget.max_cycles > 0 else cycles
+    stop_cycles = min(cycles, max(0, remaining_cycles))
+    for cycle in range(completed_cycles + 1, completed_cycles + stop_cycles + 1):
         for candidate_index in range(1, pool_size + 1):
-            if cfg.budget.max_candidates > 0 and scheduled_candidates >= cfg.budget.max_candidates:
+            if cfg.budget.max_candidates > 0 and completed_candidates + scheduled_candidates >= cfg.budget.max_candidates:
                 write_project_indexes(repo)
                 return
             scheduled_candidates += 1

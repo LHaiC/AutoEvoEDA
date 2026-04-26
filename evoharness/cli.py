@@ -3,17 +3,25 @@ from __future__ import annotations
 from pathlib import Path
 import argparse
 
-from evoharness.compare import compare_cycle
+from evoharness.artifacts import (
+    accept_rule,
+    cleanup_worktrees,
+    compare_cycle,
+    list_rule_proposals,
+    list_worktrees,
+    promote_cycle,
+    propose_rules,
+    reject_rule,
+    write_reports,
+    add_session_comment,
+    session_status,
+    set_session_status,
+)
 from evoharness.config import load_config
 from evoharness.daemon import run_daemon
 from evoharness.gui import serve_gui
 from evoharness.pipeline.cycle import run_cycles
-from evoharness.promote import promote_cycle
-from evoharness.rules import accept_rule, list_rule_proposals, propose_rules, reject_rule
-from evoharness.reports import write_reports
-from evoharness.session import add_session_comment, session_status, set_session_status
 from evoharness.understand import run_understand
-from evoharness.worktrees import cleanup_worktrees, list_worktrees
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -61,7 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
     understand.add_argument("--agent", action="store_true", help="enrich deterministic memory with Codex")
     understand.add_argument("--module", action="append", dest="modules", help="limit understanding to one allowed prefix")
     understand.add_argument("--changed-only", action="store_true", help="index changed files under selected modules")
-    gui = subparsers.add_parser("gui", help="serve a read-only local dashboard")
+    gui = subparsers.add_parser("gui", help="serve a local dashboard")
     gui.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
     gui.add_argument("--host", default="127.0.0.1")
     gui.add_argument("--port", type=int, default=8765)
@@ -72,16 +80,16 @@ def main() -> None:
     args = build_parser().parse_args()
     if args.command == "run":
         run_cycles(config_path=args.config, cycles=args.cycles, human_review=args.human_review)
-    if args.command == "daemon":
+    elif args.command == "daemon":
         run_daemon(
             config_path=args.config,
             max_cycles=args.max_cycles,
             sleep_s=args.sleep_s,
             human_review=args.human_review,
         )
-    if args.command == "promote":
+    elif args.command == "promote":
         promote_cycle(config_path=args.config, cycle=args.cycle, candidate_index=args.candidate)
-    if args.command == "worktree":
+    elif args.command == "worktree":
         if args.action == "list":
             for row in list_worktrees(args.config):
                 print(row)
@@ -94,7 +102,7 @@ def main() -> None:
                 force=args.force,
             ):
                 print(row)
-    if args.command == "rules":
+    elif args.command == "rules":
         if args.action == "list":
             for proposal in list_rule_proposals(args.config):
                 print(proposal)
@@ -108,16 +116,16 @@ def main() -> None:
             if not args.proposal:
                 raise SystemExit("rules reject requires a proposal id")
             print(reject_rule(args.config, args.proposal, " ".join(args.comment)))
-    if args.command == "config":
+    elif args.command == "config":
         load_config(args.config)
         print(f"ok: {args.config}")
-    if args.command == "compare":
+    elif args.command == "compare":
         print(compare_cycle(args.config, args.cycle))
-    if args.command == "report":
+    elif args.command == "report":
         cfg = load_config(args.config)
         repo = (args.config.parent / cfg.project.repo).resolve()
         print(write_reports(repo))
-    if args.command == "session":
+    elif args.command == "session":
         if args.action == "status":
             print(session_status(args.config))
         if args.action == "comment":
@@ -126,9 +134,9 @@ def main() -> None:
             print(set_session_status(args.config, "paused"))
         if args.action == "resume":
             print(set_session_status(args.config, "running"))
-    if args.command == "understand":
+    elif args.command == "understand":
         run_understand(args.config, use_agent=args.agent, modules=args.modules, changed_only=args.changed_only)
-    if args.command == "gui":
+    elif args.command == "gui":
         serve_gui(args.config, args.host, args.port)
 
 
