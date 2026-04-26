@@ -19,6 +19,8 @@ evo run --config examples/abc/evo.yaml --cycles 1
 
 A project provides `evo.yaml`, a prompt, and scripts for build, regression, performance, and reward gates. Each script uses exit code `0` for pass and non-zero for fail.
 
+Use `schema_version: "1.0"` for the stable local schema.
+
 `evo-harness` never trusts the agent to decide correctness or performance.
 
 Project scripts may also write structured evaluator result files. The harness records any existing JSON object files in each cycle summary and history:
@@ -72,6 +74,7 @@ evo promote --config examples/abc/evo.yaml --cycle 1
 ```
 
 Rejected cycles cannot be promoted. For pooled runs, pass `--candidate N`. Promotion uses a fast-forward merge into the configured champion branch and records a promote event in `.evo/history.jsonl`.
+Promotion is manual by default and refuses a tracked dirty project repo when `promotion.require_clean_champion` is true.
 
 Candidate worktrees are kept for inspection. List or clean them explicitly:
 
@@ -129,6 +132,12 @@ evo compare --config examples/abc/evo.yaml --cycle 1
 ```
 
 The report is written to `.evo/reports/compare-cycle-001.md` and recommends the highest numeric `evaluator_results.reward.score` when present.
+
+Write long-running summary reports:
+
+```bash
+evo report --config examples/abc/evo.yaml
+```
 
 ## Run Artifacts
 

@@ -129,7 +129,15 @@ class BudgetConfig:
 
 
 @dataclass(frozen=True)
+class PromotionConfig:
+    mode: str
+    allow_auto_after_human_accept: bool
+    require_clean_champion: bool
+
+
+@dataclass(frozen=True)
 class EvoConfig:
+    schema_version: str
     project: ProjectConfig
     agent: AgentConfig
     workspace: WorkspaceConfig
@@ -145,6 +153,7 @@ class EvoConfig:
     budget: BudgetConfig
     agents: AgentsConfig
     multi_agent: MultiAgentConfig
+    promotion: PromotionConfig
 
 
 def _section(data: dict[str, Any], name: str) -> dict[str, Any]:
@@ -205,6 +214,14 @@ def load_config(path: Path) -> EvoConfig:
     pool = {"enabled": False, "size": 1, **_optional_section(data, "pool")}
     budget = {"max_cycles": 0, "max_candidates": 0, **_optional_section(data, "budget")}
     multi_agent = {"planner": False, "reviewer": False, **_optional_section(data, "multi_agent")}
+    promotion = {
+        "mode": "manual",
+        "allow_auto_after_human_accept": False,
+        "require_clean_champion": True,
+        **_optional_section(data, "promotion"),
+    }
+    if promotion["mode"] != "manual":
+        raise ValueError("promotion.mode must be 'manual'")
     result_files = {
         "correctness": "results/correctness.json",
         "qor": "results/qor.json",
@@ -215,6 +232,7 @@ def load_config(path: Path) -> EvoConfig:
     agents_data = _optional_section(data, "agents")
 
     return EvoConfig(
+        schema_version=str(data.get("schema_version", "1.0")),
         project=ProjectConfig(**_section(data, "project")),
         agent=AgentConfig(**agent),
         workspace=WorkspaceConfig(**_section(data, "workspace")),
@@ -237,4 +255,5 @@ def load_config(path: Path) -> EvoConfig:
             code_understanding=_agent_role(agents_data, "code_understanding", "understand-main"),
         ),
         multi_agent=MultiAgentConfig(**multi_agent),
+        promotion=PromotionConfig(**promotion),
     )

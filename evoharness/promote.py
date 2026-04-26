@@ -31,6 +31,8 @@ def _find_cycle_record(records: list[dict[str, Any]], cycle: int, candidate_inde
 def promote_cycle(config_path: Path, cycle: int, candidate_index: int = 1) -> None:
     cfg = load_config(config_path)
     repo = (config_path.parent / cfg.project.repo).resolve()
+    if cfg.promotion.require_clean_champion and git(["status", "--porcelain", "--untracked-files=no"], cwd=repo):
+        raise ValueError("project repo must be clean before promotion")
     record = _find_cycle_record(_read_history(repo), cycle, candidate_index)
     decision = record["decision"]
     if decision not in {"accept", "keep"}:

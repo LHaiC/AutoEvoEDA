@@ -101,3 +101,33 @@ def write_project_indexes(repo: Path) -> None:
         runs_lines.append(f"- `{run_path.name}/`")
     runs_lines.append("")
     (runs_dir / "README.md").write_text("\n".join(runs_lines))
+
+
+def write_reports(repo: Path) -> Path:
+    reports = repo / ".evo" / "reports"
+    reports.mkdir(parents=True, exist_ok=True)
+    records = [record for record in _history(repo) if "decision" in record]
+    accepted = [record for record in records if record.get("decision") in {"accept", "keep", "promote"}]
+    rejected = [record for record in records if record.get("decision") == "reject"]
+    summary = reports / "summary.md"
+    summary.write_text(
+        "\n".join(
+            [
+                "# Evolution Summary",
+                "",
+                f"- Total decisions: {len(records)}",
+                f"- Accepted or kept: {len(accepted)}",
+                f"- Rejected: {len(rejected)}",
+                "",
+                "## Recent",
+                "",
+                *[f"- cycle {r.get('cycle')}: `{r.get('decision')}` / `{r.get('reason')}`" for r in records[-20:]],
+                "",
+            ]
+        )
+    )
+    (reports / "failures.md").write_text("\n".join(f"- cycle {r.get('cycle')}: {r.get('reason')}" for r in rejected) + "\n")
+    (reports / "accepted_patterns.md").write_text(
+        "\n".join(f"- cycle {r.get('cycle')}: {r.get('reason')}" for r in accepted) + "\n"
+    )
+    return summary

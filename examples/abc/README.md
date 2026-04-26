@@ -21,6 +21,7 @@ scripts/reward.py
 Defines the local evolution contract:
 
 ```text
+schema version
 project name
 candidate repo path
 champion branch
@@ -220,6 +221,12 @@ evo compare --config evo.yaml --cycle 1
 ```
 
 This writes `.evo/reports/compare-cycle-001.md` and does not promote any branch.
+
+Generate summary reports:
+
+```bash
+evo report --config evo.yaml
+```
 
 ## Long-Running Daemon
 

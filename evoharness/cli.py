@@ -10,6 +10,7 @@ from evoharness.gui import serve_gui
 from evoharness.pipeline.cycle import run_cycles
 from evoharness.promote import promote_cycle
 from evoharness.rules import accept_rule, list_rule_proposals, propose_rules, reject_rule
+from evoharness.reports import write_reports
 from evoharness.session import add_session_comment, session_status, set_session_status
 from evoharness.understand import run_understand
 from evoharness.worktrees import cleanup_worktrees, list_worktrees
@@ -49,6 +50,8 @@ def build_parser() -> argparse.ArgumentParser:
     compare = subparsers.add_parser("compare", help="summarize candidates from one cycle")
     compare.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
     compare.add_argument("--cycle", type=int, required=True)
+    report = subparsers.add_parser("report", help="write long-running summary reports")
+    report.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
     session = subparsers.add_parser("session", help="inspect or steer a local evolution session")
     session.add_argument("action", choices=["status", "comment", "pause", "resume"])
     session.add_argument("text", nargs="*")
@@ -110,6 +113,10 @@ def main() -> None:
         print(f"ok: {args.config}")
     if args.command == "compare":
         print(compare_cycle(args.config, args.cycle))
+    if args.command == "report":
+        cfg = load_config(args.config)
+        repo = (args.config.parent / cfg.project.repo).resolve()
+        print(write_reports(repo))
     if args.command == "session":
         if args.action == "status":
             print(session_status(args.config))
