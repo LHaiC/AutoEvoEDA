@@ -234,12 +234,14 @@ Use the daemon when you want a local main loop that can be steered from another 
 
 ```bash
 evo daemon --config evo.yaml --max-cycles 10 --sleep-s 30
+evo daemon --config evo.yaml --non-stop --sleep-s 60
 evo session comment --config evo.yaml "try a smaller mapper-local patch next"
 evo session pause --config evo.yaml
 ```
 
 The daemon still runs the same guard and evaluator contract. It only adds a long-lived loop around the normal cycle runner.
 It refuses a second daemon with the same project `.evo/session/daemon.lock` and records heartbeat events.
+`--non-stop` runs until a human pauses it; it does not swallow uncaught errors.
 
 The local GUI exposes the same controls:
 

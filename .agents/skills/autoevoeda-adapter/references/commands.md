@@ -31,6 +31,7 @@ Run a file-controlled long loop:
 
 ```bash
 evo daemon --config evo.yaml --max-cycles 10 --sleep-s 30
+evo daemon --config evo.yaml --non-stop --sleep-s 60
 evo session status --config evo.yaml
 evo session comment --config evo.yaml "steering note"
 evo session pause --config evo.yaml
@@ -58,8 +59,10 @@ evo worktree list --config evo.yaml
 evo worktree cleanup --config evo.yaml --rejected
 ```
 
-Interrupt handling is explicit. If a run stops with an active checkpoint and no final decision, inspect `.evo/runs/<run_id>/state.json`, then abandon it before scheduling new work if desired:
+Interrupt handling is explicit. If a run stops with an active checkpoint and no final decision, inspect `.evo/runs/<run_id>/state.json`, then continue for the requested number of cycles:
 
 ```bash
-evo run --config evo.yaml --abandon-active --cycles 0
+evo run --config evo.yaml --continue --cycles 1
 ```
+
+`--continue` also resumes a paused session before scheduling. `--non-stop` means run until manually paused; it is not an exception-swallowing fallback.

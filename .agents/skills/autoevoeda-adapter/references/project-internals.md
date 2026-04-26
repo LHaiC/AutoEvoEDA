@@ -6,7 +6,7 @@ Read this before editing the AutoEvoEDA framework code. Keep framework changes s
 
 - `autoevoeda/cli.py`: CLI parser and command dispatch. Add new user commands here only after implementing behavior elsewhere.
 - `autoevoeda/config.py`: strict `evo.yaml` schema dataclasses and `load_config()`. Add fields here first when changing config shape, including runner contracts.
-- `autoevoeda/pipeline/cycle.py`: candidate lifecycle and accept/reject control flow. Owns planner, domain-agent selection, coder, guard, reviewer, commit, pipeline gates, repair, evaluator snapshot, human review, checkpoint, and abandon-active sequencing.
+- `autoevoeda/pipeline/cycle.py`: candidate lifecycle and accept/reject control flow. Owns planner, domain-agent selection, coder, guard, reviewer, commit, pipeline gates, repair, evaluator snapshot, human review, checkpoint, and `--continue` sequencing.
 - `autoevoeda/artifacts.py`: `.evo/` artifact APIs. Owns run directories, events, history, phase docs, reports, session state, active-run marker, agent registry, rule proposals, promotion, compare, and worktree cleanup helpers.
 - `autoevoeda/agents/codex.py`: Codex CLI subprocess backend and optional native resume call path.
 - `autoevoeda/memory.py`: prompt assembly and durable lesson injection.
@@ -66,7 +66,6 @@ If `domain_agents` is non-empty, config validation requires `multi_agent.planner
 - `domain_agents`: optional specialist coders with their own prompt, session id, allowed paths, forbidden paths, and proposal requirements.
 - `reviewer`: optional advisory pass after guard and before gates; never replaces evaluator scripts.
 - `repair`: optional bounded pass after failed gates.
-- `rulebase`: file-backed rule proposal identity with explicit accept/reject commands.
 - `code_understanding`: optional role used by `evo understand --agent`.
 
 Domain-agent Codex output must include `hypothesis:`, `target_files:`, `expected_metric_impact:`, and `rollback_risk:` so `cycle.py` can write `agent_proposal.json` and `agent_proposal.md`.
@@ -79,6 +78,7 @@ Domain-agent Codex output must include `hypothesis:`, `target_files:`, `expected
 - Do not let agent output decide correctness or performance; only configured scripts and result files do.
 - Keep promotion explicit; accept/keep records do not merge into champion automatically.
 - Keep interrupted-run handling explicit; active checkpoints block new scheduling until abandoned.
+- Do not add broad catch-all exception paths; failures should surface unless a command has a narrow, deterministic recovery rule.
 - Keep evaluator scripts, benchmark data, golden outputs, CI, and config outside candidate edit scope by default.
 - Treat `runner.sandbox` as an evaluator environment contract, not a privilege escalation mechanism from a restricted parent process.
 - Avoid broad fallback behavior. Prefer deterministic failure with a clear reason.

@@ -7,11 +7,6 @@ project:
 
 agent:
   prompt_file: prompts/coder.md
-  timeout_s: 3600
-  sandbox: workspace-write
-  model: ""
-  profile: ""
-  config: {}
 
 workspace:
   worktree_root: ../.evo-worktrees
@@ -39,68 +34,10 @@ pipeline:
   perf: bash scripts/run_perf.sh
   reward: python scripts/reward.py
 
-result_files:
-  correctness: results/correctness.json
-  qor: results/qor.json
-  perf: results/perf.json
-  reward: results/reward.json
-
 memory:
   enabled: true
-  project_memory: .evo/memory/project.md
-  lessons: .evo/memory/lessons.jsonl
-  rejected_ideas: .evo/memory/rejected_ideas.jsonl
-  accepted_patterns: .evo/memory/accepted_patterns.md
-  inject_recent_cycles: 5
-
-human:
-  review_on_accept: false
-  stop_after_consecutive_rejects: 0
-
-repair:
-  enabled: false
-  max_attempts: 1
-  prompt_file: prompts/repair.md
 
 roles:
   planner_prompt: prompts/planner.md
   coder_prompt: prompts/coder.md
   reviewer_prompt: prompts/reviewer.md
-
-rulebase:
-  path: .evo/memory/rulebase.md
-
-pool:
-  enabled: false
-  size: 1
-
-multi_agent:
-  planner: false
-  reviewer: false
-
-budget:
-  max_cycles: 0
-  max_candidates: 0
-
-promotion:
-  require_clean_champion: true
-
-agents:
-  planner:
-    session_id: planner-main
-  coder:
-    session_id: coder-main
-    codex_session:
-      enabled: false
-      session_file: .evo/agents/coder-main/codex_session.txt
-  reviewer:
-    session_id: reviewer-main
-  repair:
-    session_id: repair-main
-  rulebase:
-    session_id: rulebase-main
-  code_understanding:
-    session_id: understand-main
-    codex_session:
-      enabled: false
-      session_file: .evo/agents/understand-main/codex_session.txt

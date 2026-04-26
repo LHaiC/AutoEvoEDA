@@ -81,20 +81,23 @@ ls .evo/runs/
 evo report --config examples/abc/evo.yaml
 ```
 
-If a run is interrupted before a final decision, inspect `.evo/runs/<run_id>/state.json` and explicitly abandon it before scheduling new work:
+If a run is interrupted before a final decision, inspect `.evo/runs/<run_id>/state.json` and continue explicitly:
 
 ```bash
-evo run --config examples/abc/evo.yaml --abandon-active --cycles 0
+evo run --config examples/abc/evo.yaml --continue --cycles 1
 ```
 
 Optional long-running loop:
 
 ```bash
 evo daemon --config examples/abc/evo.yaml --max-cycles 10 --sleep-s 30
+evo daemon --config examples/abc/evo.yaml --non-stop --sleep-s 60
 evo session comment --config examples/abc/evo.yaml "focus on one small safe improvement"
 evo session pause --config examples/abc/evo.yaml
 evo session resume --config examples/abc/evo.yaml
 ```
+
+`--non-stop` runs until manual pause; it does not catch or hide uncaught errors.
 
 Optional GUI:
 

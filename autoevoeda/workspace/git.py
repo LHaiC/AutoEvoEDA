@@ -110,6 +110,26 @@ def changed_files(repo: Path) -> list[str]:
     return sorted({*tracked, *_untracked_files(repo)})
 
 
+def candidate_diff(candidate: Candidate) -> str:
+    if not candidate.repos:
+        return git(["diff"], cwd=candidate.path)
+    parts = []
+    for repo in candidate.repos:
+        diff = git(["diff"], cwd=repo.path)
+        if diff:
+            parts.extend([f"# repo: {repo.name}", diff])
+    return "\n".join(parts)
+
+
+def candidate_changed_files(candidate: Candidate) -> list[str]:
+    if not candidate.repos:
+        return changed_files(candidate.path)
+    rows = []
+    for repo in candidate.repos:
+        rows.extend(f"{repo.name}/{path}" for path in changed_files(repo.path))
+    return rows
+
+
 def changed_line_count(repo: Path) -> int:
     out = git(["diff", "--numstat"], cwd=repo)
     total = 0

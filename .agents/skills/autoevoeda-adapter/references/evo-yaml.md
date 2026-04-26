@@ -101,8 +101,6 @@ agents:
     session_id: reviewer-main
   repair:
     session_id: repair-main
-  rulebase:
-    session_id: rulebase-main
   code_understanding:
     session_id: understand-main
 ```

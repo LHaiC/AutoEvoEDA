@@ -53,7 +53,7 @@ Read `references/evo-yaml.md`. For sibling-repo workspaces, also read `reference
 
 ## 4. Explain commands and state
 
-Read `references/commands.md` before explaining how to run, pause, resume, abandon interrupted runs, inspect `.evo/`, or promote candidates.
+Read `references/commands.md` before explaining how to run, continue, non-stop daemon mode, pause, resume, inspect `.evo/`, or promote candidates.
 
 ## 5. Framework edits
 

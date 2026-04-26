@@ -31,12 +31,13 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
     run.add_argument("--cycles", type=int, default=1)
     run.add_argument("--human-review", action="store_true", help="pause for review after all gates pass")
-    run.add_argument("--abandon-active", action="store_true", help="reject and close an interrupted active run before scheduling")
+    run.add_argument("--continue", dest="continue_run", action="store_true", help="resume completed, paused, or interrupted sessions for the requested cycles")
     daemon = subparsers.add_parser("daemon", help="run a file-controlled long-running evolution loop")
     daemon.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
     daemon.add_argument("--max-cycles", type=int, default=0, help="0 means run until paused or interrupted")
     daemon.add_argument("--sleep-s", type=float, default=60.0)
     daemon.add_argument("--human-review", action="store_true", help="pause for review after all gates pass")
+    daemon.add_argument("--non-stop", action="store_true", help="run until manually paused; ignores max cycle and consecutive-reject stops")
     promote = subparsers.add_parser("promote", help="promote an accepted or kept cycle")
     promote.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
     promote.add_argument("--cycle", type=int, required=True)
@@ -80,13 +81,14 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = build_parser().parse_args()
     if args.command == "run":
-        run_cycles(config_path=args.config, cycles=args.cycles, human_review=args.human_review, abandon_active_run=args.abandon_active)
+        run_cycles(config_path=args.config, cycles=args.cycles, human_review=args.human_review, continue_run=args.continue_run)
     elif args.command == "daemon":
         run_daemon(
             config_path=args.config,
             max_cycles=args.max_cycles,
             sleep_s=args.sleep_s,
             human_review=args.human_review,
+            non_stop=args.non_stop,
         )
     elif args.command == "promote":
         promote_cycle(config_path=args.config, cycle=args.cycle, candidate_index=args.candidate)

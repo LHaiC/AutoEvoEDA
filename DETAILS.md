@@ -167,13 +167,21 @@ evo session resume --config examples/abc/evo.yaml
 The daemon reloads `evo.yaml` between cycles, checks `.evo/session/state.json` before scheduling new work, and injects recent session comments through the normal memory path.
 It also writes `.evo/session/daemon.lock`, `.evo/session/active.json`, `.evo/session/active_run.json`, and heartbeat events so long runs are inspectable and a second daemon is refused.
 
-Interrupted runs are detected before new work is scheduled. If a run has an active checkpoint but no final decision, `evo run` and `evo daemon` stop with an error instead of silently starting a new candidate. Inspect `.evo/runs/<run_id>/state.json`, then explicitly abandon the interrupted run if you want to continue:
+Interrupted runs are detected before new work is scheduled. If a run has an active checkpoint but no final decision, plain `evo run` and `evo daemon` stop with an error instead of silently starting a new candidate. Inspect `.evo/runs/<run_id>/state.json`, then continue explicitly:
 
 ```bash
-evo run --config examples/abc/evo.yaml --abandon-active --cycles 0
+evo run --config examples/abc/evo.yaml --continue --cycles 1
 ```
 
-This writes a deterministic reject decision with reason `abandoned_interrupted_run` and clears `.evo/session/active_run.json`.
+`--continue` resumes a completed, paused, or interrupted session for the requested `--cycles`. If the previous run was interrupted, it first writes a deterministic reject decision with reason `abandoned_interrupted_run` and clears `.evo/session/active_run.json`. If the session was paused, it marks the session running before scheduling.
+
+For a loop that should run until a human manually pauses it, add non-stop mode:
+
+```bash
+evo daemon --config examples/abc/evo.yaml --non-stop --sleep-s 60
+```
+
+`--non-stop` ignores `--max-cycles` and `human.stop_after_consecutive_rejects`; it still stops on uncaught errors and never converts failures into passes.
 
 Validate configuration before long runs:
 

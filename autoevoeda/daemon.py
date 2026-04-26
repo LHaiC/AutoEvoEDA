@@ -36,7 +36,7 @@ def _write_active(repo: Path, payload: dict[str, int]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
-def run_daemon(config_path: Path, max_cycles: int = 0, sleep_s: float = 60.0, human_review: bool = False) -> None:
+def run_daemon(config_path: Path, max_cycles: int = 0, sleep_s: float = 60.0, human_review: bool = False, non_stop: bool = False) -> None:
     cfg = load_config(config_path)
     repo = _repo(config_path, cfg)
     ensure_session(repo)
@@ -48,7 +48,7 @@ def run_daemon(config_path: Path, max_cycles: int = 0, sleep_s: float = 60.0, hu
     consecutive_rejects = 0
     active = repo / ".evo" / "session" / "active.json"
     try:
-        while max_cycles <= 0 or completed_cycles < max_cycles:
+        while non_stop or max_cycles <= 0 or completed_cycles < max_cycles:
             cfg = load_config(config_path)
             repo = _repo(config_path, cfg)
             state = read_state(repo)
@@ -69,7 +69,7 @@ def run_daemon(config_path: Path, max_cycles: int = 0, sleep_s: float = 60.0, hu
                     return
                 record = run_one_cycle(config_path, cfg, cycle, candidate_index, pool_size, human_review)
                 consecutive_rejects = consecutive_rejects + 1 if record["decision"] == "reject" else 0
-                if cfg.human.stop_after_consecutive_rejects > 0 and consecutive_rejects >= cfg.human.stop_after_consecutive_rejects:
+                if not non_stop and cfg.human.stop_after_consecutive_rejects > 0 and consecutive_rejects >= cfg.human.stop_after_consecutive_rejects:
                     set_session_status(config_path, "paused")
                     append_event(repo, "daemon", "daemon_paused_after_rejects", cycle, candidate_index, "", {"consecutive_rejects": consecutive_rejects})
                     write_project_indexes(repo)
@@ -78,7 +78,7 @@ def run_daemon(config_path: Path, max_cycles: int = 0, sleep_s: float = 60.0, hu
             completed_cycles += 1
             append_event(repo, "daemon", "daemon_cycle_finished", cycle, 0, "", {"completed_cycles": completed_cycles})
             write_project_indexes(repo)
-            if max_cycles <= 0 or completed_cycles < max_cycles:
+            if non_stop or max_cycles <= 0 or completed_cycles < max_cycles:
                 time.sleep(max(0.0, sleep_s))
 
         append_event(repo, "daemon", "daemon_stopped", 0, 0, "", {"completed_cycles": completed_cycles})

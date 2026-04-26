@@ -6,11 +6,6 @@ project:
 
 agent:
   prompt_file: prompts/coder.md
-  timeout_s: 3600
-  sandbox: workspace-write
-  model: ""
-  profile: ""
-  config: {}
 
 runner:
   sandbox: danger-full-access

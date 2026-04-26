@@ -10,8 +10,27 @@ import shutil
 import subprocess
 
 from autoevoeda.config import EvoConfig, ResultFilesConfig, load_config
-from autoevoeda.workspace.git import Candidate, changed_files, git
+from autoevoeda.workspace.git import Candidate, candidate_changed_files, candidate_diff, git
 from autoevoeda.workspace.guard import GuardResult
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _write(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+
+
+def _write_json(path: Path, payload: dict[str, Any]) -> None:
+    _write(path, json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
+
+
+def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a") as handle:
+        handle.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
 
 
 def project_repo(config_path: Path) -> Path:
@@ -47,10 +66,10 @@ def write_run_state(
         "candidate_index": candidate_index,
         "branch": branch,
         "candidate": candidate,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": _now(),
     }
-    _write(run_dir(repo, run_id_value) / "state.json", json.dumps(payload, indent=2, sort_keys=True) + "\n")
-    _write(active_run_path(repo), json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    _write_json(run_dir(repo, run_id_value) / "state.json", payload)
+    _write_json(active_run_path(repo), payload)
 
 
 def clear_active_run(repo: Path) -> None:
@@ -82,10 +101,7 @@ def read_codex_session(repo: Path, agent_id: str, session_file: str) -> str:
 
 def write_codex_session_event(repo: Path, agent_id: str, event: str, payload: dict[str, Any]) -> None:
     directory = agent_dir(repo, agent_id)
-    directory.mkdir(parents=True, exist_ok=True)
-    record = {"time": datetime.now(timezone.utc).isoformat(), "event": event, **payload}
-    with (directory / "codex_session_events.jsonl").open("a") as handle:
-        handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+    _append_jsonl(directory / "codex_session_events.jsonl", {"time": _now(), "event": event, **payload})
 
 
 def write_agent_exchange(repo: Path, agent_id: str, prompt: str, stdout: str, stderr: str, ok: bool) -> None:
@@ -94,14 +110,13 @@ def write_agent_exchange(repo: Path, agent_id: str, prompt: str, stdout: str, st
     (directory / "last_prompt.md").write_text(prompt)
     (directory / "last_response.md").write_text(stdout)
     record = {
-        "time": datetime.now(timezone.utc).isoformat(),
+        "time": _now(),
         "ok": ok,
         "prompt_path": "last_prompt.md",
         "response_path": "last_response.md",
         "stderr": stderr,
     }
-    with (directory / "transcript.jsonl").open("a") as handle:
-        handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+    _append_jsonl(directory / "transcript.jsonl", record)
     memory = directory / "memory.md"
     if not memory.exists():
         memory.write_text(f"# Agent Memory: {agent_id}\n\nAdd durable role-specific notes here.\n")
@@ -121,14 +136,13 @@ def _inbox_path(repo: Path) -> Path:
 
 def read_state(repo: Path) -> dict[str, Any]:
     path = _state_path(repo)
-    return json.loads(path.read_text()) if path.exists() else {"status": "running", "updated_at": datetime.now(timezone.utc).isoformat()}
+    return json.loads(path.read_text()) if path.exists() else {"status": "running", "updated_at": _now()}
 
 
 def write_state(repo: Path, state: dict[str, Any]) -> None:
     path = _state_path(repo)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    state["updated_at"] = datetime.now(timezone.utc).isoformat()
-    path.write_text(json.dumps(state, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
+    state["updated_at"] = _now()
+    _write_json(path, state)
 
 
 def ensure_session(repo: Path) -> dict[str, Any]:
@@ -153,11 +167,8 @@ def set_session_status(config_path: Path, status: str) -> dict[str, Any]:
 def add_session_comment(config_path: Path, text: str) -> dict[str, Any]:
     repo = project_repo(config_path)
     ensure_session(repo)
-    entry = {"time": datetime.now(timezone.utc).isoformat(), "type": "human_comment", "text": text}
-    path = _inbox_path(repo)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a") as handle:
-        handle.write(json.dumps(entry, ensure_ascii=False, sort_keys=True) + "\n")
+    entry = {"time": _now(), "type": "human_comment", "text": text}
+    _append_jsonl(_inbox_path(repo), entry)
     append_event(repo, "session", "human_comment", 0, 0, "", {"text": text})
     return entry
 
@@ -195,9 +206,7 @@ def read_history(repo: Path) -> list[dict[str, Any]]:
 
 def append_history(repo: Path, record: dict[str, Any]) -> Path:
     path = repo / ".evo" / "history.jsonl"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a") as handle:
-        handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+    _append_jsonl(path, record)
     return path
 
 
@@ -211,7 +220,7 @@ def append_event(
     payload: dict[str, Any],
 ) -> dict[str, Any]:
     event = {
-        "time": datetime.now(timezone.utc).isoformat(),
+        "time": _now(),
         "type": event_type,
         "cycle": cycle,
         "candidate_index": candidate_index,
@@ -220,15 +229,8 @@ def append_event(
         "payload": payload,
     }
     for path in [repo / ".evo" / "events.jsonl", run_dir(repo, run_id_value) / "events.jsonl"]:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a") as handle:
-            handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
+        _append_jsonl(path, event)
     return event
-
-
-def _write(path: Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text)
 
 
 def write_context_doc(repo: Path, value: str, config_path: Path, cfg: EvoConfig, candidate: Candidate) -> None:
@@ -262,28 +264,8 @@ def write_propose_doc(repo: Path, value: str, prompt: str) -> None:
     _write(run_dir(repo, value) / "01_propose.md", "# Proposal Prompt\n\n```text\n" + prompt + "\n```\n")
 
 
-def _candidate_diff(candidate: Candidate) -> str:
-    if not candidate.repos:
-        return git(["diff"], cwd=candidate.path)
-    parts = []
-    for item in candidate.repos:
-        diff = git(["diff"], cwd=item.path)
-        if diff:
-            parts.extend([f"# repo: {item.name}", diff])
-    return "\n".join(parts)
-
-
-def _candidate_changed_files(candidate: Candidate) -> list[str]:
-    if not candidate.repos:
-        return changed_files(candidate.path)
-    rows = []
-    for item in candidate.repos:
-        rows.extend(f"{item.name}/{path}" for path in changed_files(item.path))
-    return rows
-
-
 def write_implement_doc(repo: Path, value: str, candidate: Candidate, guard: GuardResult) -> None:
-    _write(run_dir(repo, value) / "patch.diff", _candidate_diff(candidate) + "\n")
+    _write(run_dir(repo, value) / "patch.diff", candidate_diff(candidate) + "\n")
     _write(
         run_dir(repo, value) / "02_implement.md",
         "\n".join(
@@ -296,7 +278,7 @@ def write_implement_doc(repo: Path, value: str, candidate: Candidate, guard: Gua
                 f"- Patch: `patch.diff`",
                 "",
                 "## Files",
-                *[f"- `{path}`" for path in _candidate_changed_files(candidate)],
+                *[f"- `{path}`" for path in candidate_changed_files(candidate)],
                 "",
             ]
         ),
@@ -365,54 +347,7 @@ def collect_evaluator_results(repo: Path, result_files: ResultFilesConfig) -> Ev
 
 
 def write_evaluator_results(path: Path, snapshot: EvaluatorSnapshot) -> None:
-    path.write_text(json.dumps(asdict(snapshot), ensure_ascii=False, indent=2, sort_keys=True) + "\n")
-
-
-def _cycle_dir_name(record: dict[str, Any]) -> str:
-    branch = str(record["branch"])
-    return branch.removeprefix("evo/") if branch.startswith("evo/") else f"cycle-{int(record['cycle']):03d}"
-
-
-def write_cycle_summary(repo: Path, record: dict[str, Any]) -> Path:
-    name = _cycle_dir_name(record)
-    path = run_dir(repo, name) / "summary.md"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    evaluator_results = record.get("evaluator_results", {})
-    result_keys = ", ".join(sorted(evaluator_results)) if isinstance(evaluator_results, dict) and evaluator_results else "none"
-    path.write_text(
-        "\n".join(
-            [
-                f"# {name} Summary",
-                "",
-                f"- Branch: `{record['branch']}`",
-                f"- Candidate: `{record['candidate']}`",
-                f"- Decision: `{record['decision']}`",
-                f"- Reason: `{record['reason']}`",
-                f"- Changed files: {record['changed_files']}",
-                f"- Changed lines: {record['changed_lines']}",
-                f"- Agent: `{record.get('agent', '')}`",
-                f"- Evaluator results: {result_keys}",
-                "",
-                "## Artifacts",
-                "",
-                *[
-                    f"- {label}: `.evo/runs/{name}/{file}`"
-                    for label, file in [
-                        ("Codex stdout", "codex.stdout"),
-                        ("Codex stderr", "codex.stderr"),
-                        ("Guard result", "guard.json"),
-                        ("Build stdout", "build.stdout"),
-                        ("Regression stdout", "regression.stdout"),
-                        ("Performance stdout", "perf.stdout"),
-                        ("Reward stdout", "reward.stdout"),
-                        ("Evaluator results", "evaluator_results.json"),
-                    ]
-                ],
-                "",
-            ]
-        )
-    )
-    return path
+    _write_json(path, asdict(snapshot))
 
 
 def write_project_indexes(repo: Path) -> None:
@@ -420,7 +355,7 @@ def write_project_indexes(repo: Path) -> None:
     evo.mkdir(parents=True, exist_ok=True)
     records = [r for r in read_history(repo) if "branch" in r and r.get("event") != "promote"]
     lines = ["# AutoEvoEDA Index", "", "## Recent Candidates", ""]
-    lines.extend(f"- `{r.get('run_id', _cycle_dir_name(r))}`: `{r['decision']}` / `{r['reason']}` on `{r['branch']}`" for r in records[-20:])
+    lines.extend(f"- `{r['run_id']}`: `{r['decision']}` / `{r['reason']}` on `{r['branch']}`" for r in records[-20:])
     lines.extend(["", "## Files", "", "- `history.jsonl`", "- `events.jsonl`", "- `runs/`", "- `session/`", "- `memory/`", ""])
     (evo / "index.md").write_text("\n".join(lines))
     roadmap = evo / "roadmap.md"
@@ -437,7 +372,6 @@ def write_reports(repo: Path) -> Path:
     records = [r for r in read_history(repo) if "decision" in r]
     accepted = [r for r in records if r.get("decision") in {"accept", "keep", "promote"}]
     rejected = [r for r in records if r.get("decision") == "reject"]
-    agents = sorted({str(r.get("agent", "")) for r in records if r.get("agent")})
     summary = reports / "summary.md"
     summary.write_text(
         "\n".join(
@@ -451,30 +385,6 @@ def write_reports(repo: Path) -> Path:
                 "## Recent",
                 "",
                 *[f"- cycle {r.get('cycle')}: `{r.get('decision')}` / `{r.get('reason')}`" for r in records[-20:]],
-                "",
-            ]
-        )
-    )
-    (reports / "failures.md").write_text("\n".join(f"- cycle {r.get('cycle')}: {r.get('reason')}" for r in rejected) + "\n")
-    (reports / "accepted_patterns.md").write_text("\n".join(f"- cycle {r.get('cycle')}: {r.get('reason')}" for r in accepted) + "\n")
-    (reports / "paper_fidelity.md").write_text(
-        "\n".join(
-            [
-                "# Paper-Fidelity Summary",
-                "",
-                "| Agent | Decisions | Accept/Keep | Reject |",
-                "| --- | --- | --- | --- |",
-                *[
-                    f"| `{agent}` | {sum(1 for r in records if r.get('agent') == agent)} | {sum(1 for r in accepted if r.get('agent') == agent)} | {sum(1 for r in rejected if r.get('agent') == agent)} |"
-                    for agent in agents
-                ],
-                "",
-                "## Metric Files",
-                "",
-                "- `correctness.json`: adapter-owned correctness summary",
-                "- `qor.json`: adapter-owned QoR summary",
-                "- `perf.json`: adapter-owned performance summary",
-                "- `reward.json`: adapter-owned reward and optional decision summary",
                 "",
             ]
         )
@@ -532,7 +442,7 @@ def propose_rules(config_path: Path) -> Path:
         "",
         "## Recent Evidence",
         "",
-        *[f"- cycle {r.get('cycle')}: {r.get('decision')} / {r.get('reason')}" for r in read_history(repo)[-10:]],
+        *[f"- cycle {r.get('cycle')}: {r.get('decision')} / {r.get('reason')}" for r in history[-10:]],
         "",
         "## Human Decision",
         "",
@@ -556,7 +466,7 @@ def accept_rule(config_path: Path, proposal_id: str) -> Path:
     for token in ["skip checks", "bypass", "disable guard", "weaken", "edit evaluator", "edit reward"]:
         if token in lower:
             raise ValueError(f"unsafe rule proposal token: {token}")
-    rulebase = repo / cfg.rulebase.path
+    rulebase = repo / cfg.rulebase_path
     rulebase.parent.mkdir(parents=True, exist_ok=True)
     existing = rulebase.read_text() if rulebase.exists() else "# Rulebase\n"
     rulebase.write_text(existing.rstrip() + "\n\n" + text.rstrip() + "\n")
@@ -567,10 +477,8 @@ def accept_rule(config_path: Path, proposal_id: str) -> Path:
 def reject_rule(config_path: Path, proposal_id: str, comment: str) -> Path:
     repo = project_repo(config_path)
     path = repo / ".evo" / "rules" / "rejections.jsonl"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    record = {"time": datetime.now(timezone.utc).isoformat(), "proposal": proposal_id, "comment": comment}
-    with path.open("a") as handle:
-        handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+    record = {"time": _now(), "proposal": proposal_id, "comment": comment}
+    _append_jsonl(path, record)
     append_event(repo, "rules", "rule_rejected", 0, 0, "", record)
     return path
 
