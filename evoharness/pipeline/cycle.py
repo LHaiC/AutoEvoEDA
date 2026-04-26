@@ -30,10 +30,6 @@ def _write_text(path: Path, text: str) -> None:
     path.write_text(text)
 
 
-def _cycle_dir(repo: Path, run_id_value: str) -> Path:
-    return repo / ".evo" / run_id_value
-
-
 def _event(repo: Path, run_id_value: str, event_type: str, candidate: Candidate, payload: dict[str, object]) -> None:
     append_event(repo, run_id_value, event_type, candidate.cycle, candidate.index, candidate.branch, payload)
 
@@ -154,8 +150,8 @@ def run_one_cycle(
         candidate_index=candidate_index,
         pool_size=pool_size,
     )
-    cycle_dir = _cycle_dir(repo, run_id_value)
-    run_dir(repo, run_id_value).mkdir(parents=True, exist_ok=True)
+    cycle_dir = run_dir(repo, run_id_value)
+    cycle_dir.mkdir(parents=True, exist_ok=True)
     write_context_doc(repo, run_id_value, config_path, cfg, candidate)
     write_propose_doc(repo, run_id_value, prompt)
     _event(repo, run_id_value, "candidate_created", candidate, {"candidate": str(candidate.path)})

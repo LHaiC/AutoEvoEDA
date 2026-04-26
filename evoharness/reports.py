@@ -15,7 +15,7 @@ def _cycle_dir_name(record: dict[str, Any]) -> str:
 
 def write_cycle_summary(repo: Path, record: dict[str, Any]) -> Path:
     cycle_dir_name = _cycle_dir_name(record)
-    cycle_dir = repo / ".evo" / cycle_dir_name
+    cycle_dir = repo / ".evo" / "runs" / cycle_dir_name
     cycle_dir.mkdir(parents=True, exist_ok=True)
     evaluator_results = record.get("evaluator_results", {})
     has_results = isinstance(evaluator_results, dict) and bool(evaluator_results)
@@ -36,13 +36,13 @@ def write_cycle_summary(repo: Path, record: dict[str, Any]) -> Path:
                 "",
                 "## Artifacts",
                 "",
-                f"- Codex stdout: `.evo/{cycle_dir_name}/codex.stdout`",
-                f"- Codex stderr: `.evo/{cycle_dir_name}/codex.stderr`",
-                f"- Guard result: `.evo/{cycle_dir_name}/guard.json`",
-                f"- Build stdout: `.evo/{cycle_dir_name}/build.stdout`",
-                f"- Regression stdout: `.evo/{cycle_dir_name}/regression.stdout`",
-                f"- Performance stdout: `.evo/{cycle_dir_name}/perf.stdout`",
-                f"- Reward stdout: `.evo/{cycle_dir_name}/reward.stdout`",
+                f"- Codex stdout: `.evo/runs/{cycle_dir_name}/codex.stdout`",
+                f"- Codex stderr: `.evo/runs/{cycle_dir_name}/codex.stderr`",
+                f"- Guard result: `.evo/runs/{cycle_dir_name}/guard.json`",
+                f"- Build stdout: `.evo/runs/{cycle_dir_name}/build.stdout`",
+                f"- Regression stdout: `.evo/runs/{cycle_dir_name}/regression.stdout`",
+                f"- Performance stdout: `.evo/runs/{cycle_dir_name}/perf.stdout`",
+                f"- Reward stdout: `.evo/runs/{cycle_dir_name}/reward.stdout`",
                 f"- Evaluator results: `.evo/runs/{cycle_dir_name}/evaluator_results.json`",
                 "",
             ]

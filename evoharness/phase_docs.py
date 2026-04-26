@@ -70,8 +70,8 @@ def write_benchmark_doc(repo: Path, run_id_value: str, results: list[CommandResu
                 "",
                 f"- Return code: {result.returncode}",
                 f"- Passed: {result.ok}",
-                f"- Stdout: `.evo/{run_id_value}/{result.name}.stdout`",
-                f"- Stderr: `.evo/{run_id_value}/{result.name}.stderr`",
+                f"- Stdout: `.evo/runs/{run_id_value}/{result.name}.stdout`",
+                f"- Stderr: `.evo/runs/{run_id_value}/{result.name}.stderr`",
                 "",
             ]
         )
