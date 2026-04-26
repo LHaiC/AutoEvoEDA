@@ -60,6 +60,37 @@ class HumanConfig:
 
 
 @dataclass(frozen=True)
+class RepairConfig:
+    enabled: bool
+    max_attempts: int
+    prompt_file: str
+
+
+@dataclass(frozen=True)
+class RolesConfig:
+    planner_prompt: str
+    coder_prompt: str
+    reviewer_prompt: str
+
+
+@dataclass(frozen=True)
+class RulebaseConfig:
+    path: str
+
+
+@dataclass(frozen=True)
+class PoolConfig:
+    enabled: bool
+    size: int
+
+
+@dataclass(frozen=True)
+class BudgetConfig:
+    max_cycles: int
+    max_candidates: int
+
+
+@dataclass(frozen=True)
 class EvoConfig:
     project: ProjectConfig
     agent: AgentConfig
@@ -68,6 +99,11 @@ class EvoConfig:
     pipeline: PipelineConfig
     memory: MemoryConfig
     human: HumanConfig
+    repair: RepairConfig
+    roles: RolesConfig
+    rulebase: RulebaseConfig
+    pool: PoolConfig
+    budget: BudgetConfig
 
 
 def _section(data: dict[str, Any], name: str) -> dict[str, Any]:
@@ -99,11 +135,12 @@ def load_config(path: Path) -> EvoConfig:
         "inject_recent_cycles": 5,
         **_optional_section(data, "memory"),
     }
-    human = {
-        "review_on_accept": False,
-        "stop_after_consecutive_rejects": 0,
-        **_optional_section(data, "human"),
-    }
+    human = {"review_on_accept": False, "stop_after_consecutive_rejects": 0, **_optional_section(data, "human")}
+    repair = {"enabled": False, "max_attempts": 1, "prompt_file": "prompts/repair.md", **_optional_section(data, "repair")}
+    roles = {"planner_prompt": "", "coder_prompt": "", "reviewer_prompt": "", **_optional_section(data, "roles")}
+    rulebase = {"path": ".evo/memory/rulebase.md", **_optional_section(data, "rulebase")}
+    pool = {"enabled": False, "size": 1, **_optional_section(data, "pool")}
+    budget = {"max_cycles": 0, "max_candidates": 0, **_optional_section(data, "budget")}
 
     return EvoConfig(
         project=ProjectConfig(**_section(data, "project")),
@@ -113,4 +150,9 @@ def load_config(path: Path) -> EvoConfig:
         pipeline=PipelineConfig(**_section(data, "pipeline")),
         memory=MemoryConfig(**memory),
         human=HumanConfig(**human),
+        repair=RepairConfig(**repair),
+        roles=RolesConfig(**roles),
+        rulebase=RulebaseConfig(**rulebase),
+        pool=PoolConfig(**pool),
+        budget=BudgetConfig(**budget),
     )

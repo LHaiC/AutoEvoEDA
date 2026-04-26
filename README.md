@@ -41,4 +41,39 @@ Accepted or kept candidates are committed on their candidate branch, but are not
 evo promote --config examples/abc/evo.yaml --cycle 1
 ```
 
-Rejected cycles cannot be promoted. Promotion uses a fast-forward merge into the configured champion branch and records a promote event in `.evo/history.jsonl`.
+Rejected cycles cannot be promoted. For pooled runs, pass `--candidate N`. Promotion uses a fast-forward merge into the configured champion branch and records a promote event in `.evo/history.jsonl`.
+
+## Repair, Roles, And Candidate Pools
+
+Enable one bounded repair attempt when a gate fails:
+
+```yaml
+repair:
+  enabled: true
+  max_attempts: 1
+  prompt_file: prompts/repair.md
+```
+
+Role prompt files can align the run with planner/coder/reviewer guidance without creating multiple agents:
+
+```yaml
+roles:
+  planner_prompt: prompts/planner.md
+  coder_prompt: prompts/coder.md
+  reviewer_prompt: prompts/reviewer.md
+rulebase:
+  path: .evo/memory/rulebase.md
+```
+
+Run small candidate pools with explicit budgets:
+
+```yaml
+pool:
+  enabled: true
+  size: 2
+budget:
+  max_cycles: 3
+  max_candidates: 4
+```
+
+Each candidate still runs the same deterministic guards and project scripts.

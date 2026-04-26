@@ -10,6 +10,7 @@ class Candidate:
     cycle: int
     branch: str
     path: Path
+    index: int = 1
 
 
 def git(args: list[str], cwd: Path, check: bool = True) -> str:
@@ -30,12 +31,15 @@ def create_candidate_worktree(
     worktree_root: Path,
     project_name: str,
     cycle: int,
+    candidate_index: int = 1,
+    pool_size: int = 1,
 ) -> Candidate:
-    branch = f"evo/cycle-{cycle:03d}"
-    path = worktree_root / f"{project_name}-cycle-{cycle:03d}"
+    suffix = f"cycle-{cycle:03d}" if pool_size == 1 else f"cycle-{cycle:03d}-cand-{candidate_index:03d}"
+    branch = f"evo/{suffix}"
+    path = worktree_root / f"{project_name}-{suffix}"
     worktree_root.mkdir(parents=True, exist_ok=True)
     git(["worktree", "add", "-B", branch, str(path), champion_branch], cwd=repo)
-    return Candidate(cycle=cycle, branch=branch, path=path)
+    return Candidate(cycle=cycle, branch=branch, path=path, index=candidate_index)
 
 
 def _untracked_files(repo: Path) -> list[str]:

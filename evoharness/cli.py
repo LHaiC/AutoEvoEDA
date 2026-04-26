@@ -17,6 +17,7 @@ def build_parser() -> argparse.ArgumentParser:
     promote = subparsers.add_parser("promote", help="promote an accepted or kept cycle")
     promote.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
     promote.add_argument("--cycle", type=int, required=True)
+    promote.add_argument("--candidate", type=int, default=1)
     return parser
 
 
@@ -25,7 +26,7 @@ def main() -> None:
     if args.command == "run":
         run_cycles(config_path=args.config, cycles=args.cycles, human_review=args.human_review)
     if args.command == "promote":
-        promote_cycle(config_path=args.config, cycle=args.cycle)
+        promote_cycle(config_path=args.config, cycle=args.cycle, candidate_index=args.candidate)
 
 
 if __name__ == "__main__":

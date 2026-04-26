@@ -153,3 +153,36 @@ Adjust these paths for the real ABC checkout.
 ## Placeholder Scripts
 
 The scripts in this example directory are placeholders. Replace them in a real ABC checkout with commands that actually build, regress, benchmark, compare, and reward the candidate.
+
+## Optional Long-Running Files
+
+### `prompts/planner.md`
+
+Advisory planning guidance. It should narrow the search target before the coding prompt is applied. In this minimal harness it is prompt context, not a separate agent.
+
+### `prompts/reviewer.md`
+
+Advisory review guidance. It should describe risks the coding agent must avoid, such as hard-coded benchmark names, weakened equivalence checks, or scope creep. It cannot accept a patch.
+
+### `prompts/repair.md`
+
+Repair guidance used when `repair.enabled` is true and a gate fails. Keep this prompt focused on fixing the failing gate without weakening evaluators.
+
+### `.evo/memory/rulebase.md`
+
+Long-running rule memory. Use it for project-neutral constraints, accepted operating rules, and lessons that should steer future prompts. Do not place private project details in the public ABC example.
+
+## Candidate Pools
+
+The example config keeps pool execution disabled. To run several independent candidates per cycle in a real checkout, set:
+
+```yaml
+pool:
+  enabled: true
+  size: 2
+budget:
+  max_cycles: 3
+  max_candidates: 4
+```
+
+Each candidate receives its own branch and worktree, such as `evo/cycle-001-cand-002`.

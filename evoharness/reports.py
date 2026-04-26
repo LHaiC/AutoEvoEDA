@@ -4,15 +4,23 @@ from pathlib import Path
 from typing import Any
 
 
-def write_cycle_summary(repo: Path, record: dict[str, Any]) -> Path:
+def _cycle_dir_name(record: dict[str, Any]) -> str:
+    branch = str(record["branch"])
+    if branch.startswith("evo/"):
+        return branch.removeprefix("evo/")
     cycle = int(record["cycle"])
-    cycle_dir = repo / ".evo" / f"cycle-{cycle:03d}"
+    return f"cycle-{cycle:03d}"
+
+
+def write_cycle_summary(repo: Path, record: dict[str, Any]) -> Path:
+    cycle_dir_name = _cycle_dir_name(record)
+    cycle_dir = repo / ".evo" / cycle_dir_name
     cycle_dir.mkdir(parents=True, exist_ok=True)
     path = cycle_dir / "summary.md"
     path.write_text(
         "\n".join(
             [
-                f"# Cycle {cycle:03d} Summary",
+                f"# {cycle_dir_name} Summary",
                 "",
                 f"- Branch: `{record['branch']}`",
                 f"- Candidate: `{record['candidate']}`",
@@ -23,13 +31,13 @@ def write_cycle_summary(repo: Path, record: dict[str, Any]) -> Path:
                 "",
                 "## Artifacts",
                 "",
-                f"- Codex stdout: `.evo/cycle-{cycle:03d}/codex.stdout`",
-                f"- Codex stderr: `.evo/cycle-{cycle:03d}/codex.stderr`",
-                f"- Guard result: `.evo/cycle-{cycle:03d}/guard.json`",
-                f"- Build stdout: `.evo/cycle-{cycle:03d}/build.stdout`",
-                f"- Regression stdout: `.evo/cycle-{cycle:03d}/regression.stdout`",
-                f"- Performance stdout: `.evo/cycle-{cycle:03d}/perf.stdout`",
-                f"- Reward stdout: `.evo/cycle-{cycle:03d}/reward.stdout`",
+                f"- Codex stdout: `.evo/{cycle_dir_name}/codex.stdout`",
+                f"- Codex stderr: `.evo/{cycle_dir_name}/codex.stderr`",
+                f"- Guard result: `.evo/{cycle_dir_name}/guard.json`",
+                f"- Build stdout: `.evo/{cycle_dir_name}/build.stdout`",
+                f"- Regression stdout: `.evo/{cycle_dir_name}/regression.stdout`",
+                f"- Performance stdout: `.evo/{cycle_dir_name}/perf.stdout`",
+                f"- Reward stdout: `.evo/{cycle_dir_name}/reward.stdout`",
                 "",
             ]
         )

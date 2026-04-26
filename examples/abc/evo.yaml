@@ -45,3 +45,24 @@ memory:
 human:
   review_on_accept: false
   stop_after_consecutive_rejects: 0
+
+repair:
+  enabled: false
+  max_attempts: 1
+  prompt_file: prompts/repair.md
+
+roles:
+  planner_prompt: prompts/planner.md
+  coder_prompt: prompts/coder.md
+  reviewer_prompt: prompts/reviewer.md
+
+rulebase:
+  path: .evo/memory/rulebase.md
+
+pool:
+  enabled: false
+  size: 1
+
+budget:
+  max_cycles: 0
+  max_candidates: 0

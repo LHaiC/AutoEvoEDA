@@ -20,39 +20,70 @@ def _tail_lines(path: Path, count: int) -> list[str]:
     return lines[-count:]
 
 
+def _role_section(repo: Path, title: str, path: str, base_prompt: str) -> list[str]:
+    if not path:
+        return []
+    content = _read_if_present(repo / path)
+    if content and content != base_prompt.strip():
+        return ["", f"## {title}", content]
+    return []
+
+
 def render_prompt(base_prompt: str, repo: Path, cfg: EvoConfig) -> str:
-    if not cfg.memory.enabled:
-        return base_prompt
+    sections = [base_prompt.rstrip()]
+    sections.extend(_role_section(repo, "Planning role guidance", cfg.roles.planner_prompt, base_prompt))
+    sections.extend(_role_section(repo, "Coding role guidance", cfg.roles.coder_prompt, base_prompt))
+    sections.extend(_role_section(repo, "Reviewer advisory guidance", cfg.roles.reviewer_prompt, base_prompt))
 
-    sections = [base_prompt.rstrip(), "", "# evo-harness context"]
+    if cfg.memory.enabled:
+        sections.extend(["", "# evo-harness context"])
+        for title, path in [
+            ("Project memory", cfg.memory.project_memory),
+            ("Rulebase", cfg.rulebase.path),
+            ("Accepted patterns", cfg.memory.accepted_patterns),
+        ]:
+            content = _read_if_present(repo / path)
+            if content:
+                sections.extend(["", f"## {title}", content])
 
-    project_memory = _read_if_present(repo / cfg.memory.project_memory)
-    if project_memory:
-        sections.extend(["", "## Project memory", project_memory])
+        rejected_ideas = _tail_lines(repo / cfg.memory.rejected_ideas, cfg.memory.inject_recent_cycles)
+        if rejected_ideas:
+            sections.extend(["", "## Recent rejected ideas", *rejected_ideas])
 
-    accepted_patterns = _read_if_present(repo / cfg.memory.accepted_patterns)
-    if accepted_patterns:
-        sections.extend(["", "## Accepted patterns", accepted_patterns])
+        lessons = _tail_lines(repo / cfg.memory.lessons, cfg.memory.inject_recent_cycles)
+        if lessons:
+            sections.extend(["", "## Recent lessons", *lessons])
 
-    rejected_ideas = _tail_lines(repo / cfg.memory.rejected_ideas, cfg.memory.inject_recent_cycles)
-    if rejected_ideas:
-        sections.extend(["", "## Recent rejected ideas", *rejected_ideas])
+        sections.extend(
+            [
+                "",
+                "## Patch scope",
+                "Allowed paths:",
+                *[f"- {path}" for path in cfg.guards.allowed_paths],
+                "Forbidden paths:",
+                *[f"- {path}" for path in cfg.guards.forbidden_paths],
+            ]
+        )
+    return "\n".join(sections).rstrip() + "\n"
 
-    lessons = _tail_lines(repo / cfg.memory.lessons, cfg.memory.inject_recent_cycles)
-    if lessons:
-        sections.extend(["", "## Recent lessons", *lessons])
 
-    sections.extend(
+def render_repair_prompt(base_prompt: str, failed_gate: str, stdout: str, stderr: str) -> str:
+    return "\n".join(
         [
+            base_prompt.rstrip(),
             "",
-            "## Patch scope",
-            "Allowed paths:",
-            *[f"- {path}" for path in cfg.guards.allowed_paths],
-            "Forbidden paths:",
-            *[f"- {path}" for path in cfg.guards.forbidden_paths],
+            "# Repair task",
+            f"The previous candidate failed gate: {failed_gate}",
+            "Repair the candidate without weakening guards, scripts, or correctness checks.",
+            "",
+            "## Failed gate stdout",
+            stdout.rstrip(),
+            "",
+            "## Failed gate stderr",
+            stderr.rstrip(),
+            "",
         ]
     )
-    return "\n".join(sections).rstrip() + "\n"
 
 
 def append_lesson(repo: Path, cfg: EvoConfig, record: dict[str, Any]) -> None:
