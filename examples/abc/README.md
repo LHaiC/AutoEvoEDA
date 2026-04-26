@@ -215,6 +215,17 @@ evo session pause --config evo.yaml
 
 The daemon still runs the same guard and evaluator contract. It only adds a long-lived loop around the normal cycle runner.
 
+## Candidate Worktrees
+
+Rejected candidates can be removed after inspection:
+
+```bash
+evo worktree list --config evo.yaml
+evo worktree cleanup --config evo.yaml --rejected
+```
+
+Accepted and kept candidates are skipped unless `--include-accepted` is set.
+
 ## Codex Session Resume
 
 Each role can keep a native Codex session id in `.evo/agents/<agent_id>/codex_session.txt`:

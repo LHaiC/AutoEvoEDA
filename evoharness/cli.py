@@ -9,6 +9,7 @@ from evoharness.pipeline.cycle import run_cycles
 from evoharness.promote import promote_cycle
 from evoharness.session import add_session_comment, session_status, set_session_status
 from evoharness.understand import run_understand
+from evoharness.worktrees import cleanup_worktrees, list_worktrees
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -27,6 +28,13 @@ def build_parser() -> argparse.ArgumentParser:
     promote.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
     promote.add_argument("--cycle", type=int, required=True)
     promote.add_argument("--candidate", type=int, default=1)
+    worktree = subparsers.add_parser("worktree", help="list or clean candidate worktrees")
+    worktree.add_argument("action", choices=["list", "cleanup"])
+    worktree.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
+    worktree.add_argument("--rejected", action="store_true")
+    worktree.add_argument("--older-than-days", type=int, default=0)
+    worktree.add_argument("--include-accepted", action="store_true")
+    worktree.add_argument("--force", action="store_true")
     session = subparsers.add_parser("session", help="inspect or steer a local evolution session")
     session.add_argument("action", choices=["status", "comment", "pause", "resume"])
     session.add_argument("text", nargs="*")
@@ -54,6 +62,19 @@ def main() -> None:
         )
     if args.command == "promote":
         promote_cycle(config_path=args.config, cycle=args.cycle, candidate_index=args.candidate)
+    if args.command == "worktree":
+        if args.action == "list":
+            for row in list_worktrees(args.config):
+                print(row)
+        if args.action == "cleanup":
+            for row in cleanup_worktrees(
+                args.config,
+                rejected=args.rejected,
+                older_than_days=args.older_than_days,
+                include_accepted=args.include_accepted,
+                force=args.force,
+            ):
+                print(row)
     if args.command == "session":
         if args.action == "status":
             print(session_status(args.config))

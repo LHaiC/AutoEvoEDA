@@ -66,6 +66,15 @@ evo promote --config examples/abc/evo.yaml --cycle 1
 
 Rejected cycles cannot be promoted. For pooled runs, pass `--candidate N`. Promotion uses a fast-forward merge into the configured champion branch and records a promote event in `.evo/history.jsonl`.
 
+Candidate worktrees are kept for inspection. List or clean them explicitly:
+
+```bash
+evo worktree list --config examples/abc/evo.yaml
+evo worktree cleanup --config examples/abc/evo.yaml --rejected
+```
+
+Cleanup uses `git worktree remove`, skips accepted and kept candidates by default, and skips dirty worktrees unless `--force` is provided.
+
 ## Repair, Roles, And Candidate Pools
 
 Enable one bounded repair attempt when a gate fails:
