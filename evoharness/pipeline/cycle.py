@@ -9,8 +9,9 @@ from evoharness.config import EvoConfig, load_config
 from evoharness.human import review_candidate
 from evoharness.memory import append_lesson, render_prompt
 from evoharness.pipeline.runner import CommandResult, run_cmd
+from evoharness.reports import write_cycle_summary
 from evoharness.state import append_history
-from evoharness.workspace.git import Candidate, create_candidate_worktree
+from evoharness.workspace.git import Candidate, commit_candidate, create_candidate_worktree
 from evoharness.workspace.guard import GuardResult, check_patch_scope
 
 
@@ -39,6 +40,7 @@ def _record_decision(
     }
     append_history(repo, record)
     append_lesson(repo, cfg, record)
+    write_cycle_summary(repo, record)
     return record
 
 
@@ -81,6 +83,8 @@ def run_one_cycle(config_path: Path, cfg: EvoConfig, cycle: int, human_review: b
     _write_text(cycle_dir / "guard.json", json.dumps(asdict(guard), indent=2, sort_keys=True))
     if not guard.ok:
         return _record_decision(repo, cycle, candidate, "reject", f"guard_failed:{guard.reason}", guard, cfg)
+
+    commit_candidate(candidate.path, cycle)
 
     for name, cmd in [
         ("build", cfg.pipeline.build),

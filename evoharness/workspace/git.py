@@ -38,9 +38,14 @@ def create_candidate_worktree(
     return Candidate(cycle=cycle, branch=branch, path=path)
 
 
-def changed_files(repo: Path) -> list[str]:
-    out = git(["diff", "--name-only"], cwd=repo)
+def _untracked_files(repo: Path) -> list[str]:
+    out = git(["ls-files", "--others", "--exclude-standard"], cwd=repo)
     return out.splitlines() if out else []
+
+
+def changed_files(repo: Path) -> list[str]:
+    tracked = git(["diff", "--name-only"], cwd=repo).splitlines()
+    return sorted({*tracked, *_untracked_files(repo)})
 
 
 def changed_line_count(repo: Path) -> int:
@@ -52,4 +57,18 @@ def changed_line_count(repo: Path) -> int:
             total += int(added)
         if deleted != "-":
             total += int(deleted)
+    for path in _untracked_files(repo):
+        file_path = repo / path
+        if file_path.is_file():
+            total += len(file_path.read_bytes().splitlines())
     return total
+
+
+def has_uncommitted_changes(repo: Path) -> bool:
+    return bool(git(["status", "--porcelain"], cwd=repo))
+
+
+def commit_candidate(repo: Path, cycle: int) -> None:
+    if has_uncommitted_changes(repo):
+        git(["add", "-A"], cwd=repo)
+        git(["commit", "-m", f"evo: candidate cycle {cycle:03d}"], cwd=repo)

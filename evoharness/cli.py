@@ -4,6 +4,7 @@ from pathlib import Path
 import argparse
 
 from evoharness.pipeline.cycle import run_cycles
+from evoharness.promote import promote_cycle
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -13,6 +14,9 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
     run.add_argument("--cycles", type=int, default=1)
     run.add_argument("--human-review", action="store_true", help="pause for review after all gates pass")
+    promote = subparsers.add_parser("promote", help="promote an accepted or kept cycle")
+    promote.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
+    promote.add_argument("--cycle", type=int, required=True)
     return parser
 
 
@@ -20,6 +24,8 @@ def main() -> None:
     args = build_parser().parse_args()
     if args.command == "run":
         run_cycles(config_path=args.config, cycles=args.cycles, human_review=args.human_review)
+    if args.command == "promote":
+        promote_cycle(config_path=args.config, cycle=args.cycle)
 
 
 if __name__ == "__main__":

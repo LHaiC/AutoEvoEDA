@@ -32,3 +32,13 @@ evo run --config examples/abc/evo.yaml --cycles 5 --human-review
 ```
 
 Human review can accept, reject, or keep an all-gates-passed candidate. It does not bypass build, regression, performance, reward, or patch guards.
+
+## Explicit Promotion
+
+Accepted or kept candidates are committed on their candidate branch, but are not promoted automatically. Promote a reviewed cycle explicitly:
+
+```bash
+evo promote --config examples/abc/evo.yaml --cycle 1
+```
+
+Rejected cycles cannot be promoted. Promotion uses a fast-forward merge into the configured champion branch and records a promote event in `.evo/history.jsonl`.
