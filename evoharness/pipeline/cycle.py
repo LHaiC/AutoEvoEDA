@@ -147,6 +147,18 @@ def _role_prompt(repo: Path, cfg: EvoConfig, path: str) -> str:
     return render_prompt((repo / path).read_text(), repo, cfg) if path else ""
 
 
+def _planner_context(repo: Path, cfg: EvoConfig) -> str:
+    lines = ["", "# Planner Context", "", "## Recent Outcomes"]
+    for record in read_history(repo)[-10:]:
+        reward = record.get("evaluator_results", {}).get("reward", {})
+        score = reward.get("score", "") if isinstance(reward, dict) else ""
+        lines.append(f"- cycle {record.get('cycle')}: {record.get('decision')} / {record.get('reason')} / agent={record.get('agent', '')} / score={score}")
+    if cfg.domain_agents:
+        lines.extend(["", "## Available Domain Agents"])
+        lines.extend(f"- {agent.name}: {', '.join(agent.allowed_paths)}" for agent in cfg.domain_agents)
+    return "\n".join(lines) + "\n"
+
+
 def _select_domain_agent(cfg: EvoConfig, planner_stdout: str) -> DomainAgentConfig | None:
     if not cfg.domain_agents:
         return None
@@ -221,6 +233,7 @@ def run_one_cycle(
     domain_agent = None
     if cfg.multi_agent.planner and cfg.roles.planner_prompt:
         planner_prompt = _role_prompt(repo, cfg, cfg.roles.planner_prompt)
+        planner_prompt += _planner_context(repo, cfg)
         if cfg.domain_agents:
             planner_prompt += "\n# Domain agent selection\nEmit exactly one line in this form:\nagent: <name>\nAvailable agents:\n"
             planner_prompt += "\n".join(f"- {agent.name}" for agent in cfg.domain_agents) + "\n"
@@ -325,6 +338,14 @@ def run_one_cycle(
             evaluator_results=evaluator_snapshot.data,
             agent=agent_name,
         )
+    reward = evaluator_snapshot.data.get("reward", {})
+    reward_decision = reward.get("decision") if isinstance(reward, dict) else None
+    if reward_decision:
+        if reward_decision not in {"accept", "keep", "reject"}:
+            return _record_decision(repo, run_id_value, candidate, "reject", f"evaluator_results_failed:reward_decision_invalid:{reward_decision}", guard, cfg, evaluator_results=evaluator_snapshot.data, agent=agent_name)
+        if reward_decision != "accept":
+            reason = str(reward.get("reason", f"reward_{reward_decision}"))
+            return _record_decision(repo, run_id_value, candidate, reward_decision, reason, guard, cfg, evaluator_results=evaluator_snapshot.data, agent=agent_name)
 
     if human_review or cfg.human.review_on_accept:
         human_decision = review_candidate(candidate, guard)

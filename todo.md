@@ -16,33 +16,33 @@ This TODO tracks the remaining work needed to move `evo-harness` from a reusable
   - Adapter-owned. Keep framework examples as placeholders; real projects provide build, regression, CEC, QoR, performance, and reward scripts.
   - Expected files: `scripts/build.sh`, `scripts/run_regression.sh`, `scripts/compare_regression.py`, `scripts/run_perf.sh`, `scripts/reward.py`.
 
-- [~] **Cycle-0 knowledge bootstrap**
-  - Generate a structured ABC repository profile covering directory hierarchy, build system, module interactions, command registration, and safe extension points.
-  - Output should seed `.evo/memory/code/` before autonomous evolution starts.
+- [x] **Cycle-0 knowledge bootstrap**
+  - Framework done: `evo understand` writes `.evo/memory/code/bootstrap/repo_profile.md` plus subsystem, safety, tutorial, and prior-study skeletons.
+  - Adapter content can enrich these files before autonomous evolution starts.
 
-- [ ] **ABC tutorial memory**
-  - Add Markdown guidance for adding commands/functions, updating `module.make`, preserving Makefile conventions, and interacting with ABC APIs.
-  - This should be injected into planner/coder prompts as durable project memory.
+- [x] **ABC tutorial memory**
+  - Framework done: `bootstrap/abc_tutorial.md` is generated and injected into prompts when memory is enabled.
+  - ABC-specific command/module.make/API details remain adapter-owned content.
 
-- [ ] **External prior-study memory**
-  - Record structured findings from flow tuning, technology mapping, and logic-optimization prototypes.
-  - Use the findings as design guidance without directly copying incompatible implementations.
+- [x] **External prior-study memory**
+  - Framework done: `bootstrap/prior_studies.md` is generated and injected into prompts when memory is enabled.
+  - Project teams own the actual external-study content.
 
-- [~] **Domain coding agents**
-  - Split the single generic coder into Flow Agent, Mapper Agent, and Logic Minimization Agent.
-  - Each agent should have a distinct prompt, memory, session id, and output artifact stream.
+- [x] **Domain coding agents**
+  - Framework done: `domain_agents` supports configurable domain identities with distinct prompt, memory, session id, and artifact stream.
+  - ABC adapters can instantiate Flow, Mapper, and Logic Minimization agents.
 
-- [~] **Per-agent edit scopes**
-  - Give each domain agent its own allowed paths, forbidden paths, prompt, memory, session id, and patch guard.
-  - Prevent cross-subsystem edits unless explicitly approved by the planner/human policy.
+- [x] **Per-agent edit scopes**
+  - Framework done: selected domain agents use their configured allowed/forbidden paths in patch guard.
+  - Cross-subsystem edits are rejected by guard unless adapter scopes allow them.
 
-- [~] **Planner coordination**
-  - Make the planner read previous QoR, failures, hypotheses, and agent outputs.
-  - The planner should choose which subsystem and agent should evolve next.
+- [x] **Planner coordination**
+  - Framework done: planner prompt receives recent outcome context and must emit exactly one `agent: <name>` when domain agents are configured.
+  - Invalid, missing, or unknown selections reject the candidate.
 
-- [~] **Agent proposal protocol**
-  - Require each coding agent to emit a structured hypothesis, target files, expected metric impact, and rollback risk before implementation.
-  - Store proposals under `.evo/runs/<run_id>/` for later attribution.
+- [x] **Agent proposal protocol**
+  - Framework done: domain-agent responses must include `hypothesis`, `target_files`, `expected_metric_impact`, and `rollback_risk`.
+  - Proposals are stored as `agent_proposal.json` and `agent_proposal.md` under `.evo/runs/<run_id>/`.
 
 - [x] **Formal correctness gate**
   - Adapter-owned. The framework already treats non-zero regression/compare exits and invalid result JSON as rejects.
@@ -56,41 +56,41 @@ This TODO tracks the remaining work needed to move `evo-harness` from a reusable
   - Adapter-owned. Keep cluster/local parallelism inside project scripts so the framework remains portable.
   - Project scripts should write deterministic JSON summaries after parallel jobs finish.
 
-- [~] **Metric schema**
-  - Framework collects object-shaped `correctness.json`, `qor.json`, `perf.json`, and `reward.json` and rejects invalid JSON.
-  - ABC-specific field names remain adapter-owned; define them before paper-level experiments.
+- [x] **Metric schema**
+  - Framework done: object-shaped `correctness.json`, `qor.json`, `perf.json`, and `reward.json` are collected and invalid JSON is rejected.
+  - `reward.json` may include `score`, `decision`, and `reason`; ABC-specific metric fields remain adapter-owned.
 
-- [~] **Conditional keep logic**
-  - Support human/planner-reviewed `keep for synergy` decisions for partial improvements.
-  - Preserve candidates that may help another subsystem later without auto-promoting them.
+- [x] **Conditional keep logic**
+  - Framework done: human review can choose `keep`, and adapter reward JSON can return `{"decision":"keep","reason":"..."}`.
+  - Kept candidates are preserved without auto-promotion.
 
-- [~] **Self-debugging loop**
-  - Make compile/check failures feed back into the responsible coding agent with bounded retries and failure classification.
-  - Attribute failures to build, CEC, regression, QoR, reward, or guard categories.
+- [x] **Self-debugging loop**
+  - Framework done: failed gates are classified by gate name and fed into the bounded repair agent when `repair.enabled` is true.
+  - Adapter scripts own fine-grained CEC/QoR classifications inside their stdout/stderr and result JSON.
 
-- [ ] **Self-evolving rulebase agent**
-  - Replace deterministic rule proposals with evidence-based rule patches proposed from repeated success/failure patterns.
-  - Keep human approval before accepted rules enter future prompts.
+- [x] **Self-evolving rulebase agent**
+  - Framework done: `evo rules propose` creates evidence-based proposals from repeated recent outcomes.
+  - `evo rules accept` is still explicit human approval before rules enter future prompts.
 
-- [ ] **Rule safety policy**
-  - Require human approval for rule relaxations.
-  - Enforce global safety constraints before rulebase updates enter future prompts.
+- [x] **Rule safety policy**
+  - Framework done: rule acceptance requires explicit CLI approval, a `Safety: strict` marker, and rejects unsafe proposal tokens.
+  - Accepted rules are appended to the configured rulebase only after this check.
 
-- [~] **Long-run intervention policy**
-  - Trigger human intervention on safety events or repeated failures.
-  - Avoid requiring manual review on every accepted candidate.
+- [x] **Long-run intervention policy**
+  - Framework done: `human.stop_after_consecutive_rejects` pauses daemon runs after repeated rejects.
+  - Accepted candidates still avoid mandatory manual review unless configured.
 
-- [~] **ABC result reproducibility**
-  - Record benchmark versions, libraries, flow definitions, machine metadata, and commit hashes needed to reproduce reported QoR.
-  - Store metadata in `.evo/runs/<run_id>/` and summary reports.
+- [x] **ABC result reproducibility**
+  - Framework done: each run writes `reproducibility.json` with config, project, branch, and commit metadata.
+  - Adapter scripts own benchmark/library/flow metadata inside result JSON.
 
-- [ ] **Paper-level report**
-  - Generate tables and summaries matching the paper's primary and auxiliary metrics, ablations, and per-subsystem attribution.
-  - Reports should distinguish Flow, Mapper, and Logic Minimization contributions.
+- [x] **Paper-level report**
+  - Framework done: `evo report` writes `paper_fidelity.md` with per-agent attribution and metric-file contracts.
+  - Exact paper tables depend on adapter-owned ABC metrics.
 
-- [~] **Backend fidelity note**
-  - Document that this implementation uses Codex/GPT-style local agents, while the paper used Cursor/Claude-style agents.
-  - Compare behavior and workflow shape rather than claiming identical agent execution.
+- [x] **Backend fidelity note**
+  - Framework done: README states this is Codex/GPT-style local-agent infrastructure inspired by the paper, not identical backend execution.
+  - Backend differences are documented as workflow-shape comparison rather than exact reproduction.
 
 ## Implementation Order
 

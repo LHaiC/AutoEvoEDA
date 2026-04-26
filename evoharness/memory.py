@@ -66,6 +66,10 @@ def render_prompt(base_prompt: str, repo: Path, cfg: EvoConfig) -> str:
         code_index = _read_if_present(repo / ".evo" / "memory" / "code" / "index.md")
         if code_index:
             sections.extend(["", "## Code understanding index", code_index])
+        for rel in ["subsystem_map.md", "safe_edit_protocol.md", "prior_studies.md", "abc_tutorial.md"]:
+            content = _read_if_present(repo / ".evo" / "memory" / "code" / "bootstrap" / rel)
+            if content:
+                sections.extend(["", f"## Bootstrap {rel}", content])
 
         for title, agent_id in [
             ("Planner agent memory", cfg.agents.planner.session_id),

@@ -375,6 +375,7 @@ def write_reports(repo: Path) -> Path:
     records = [r for r in read_history(repo) if "decision" in r]
     accepted = [r for r in records if r.get("decision") in {"accept", "keep", "promote"}]
     rejected = [r for r in records if r.get("decision") == "reject"]
+    agents = sorted({str(r.get("agent", "")) for r in records if r.get("agent")})
     summary = reports / "summary.md"
     summary.write_text(
         "\n".join(
@@ -394,6 +395,28 @@ def write_reports(repo: Path) -> Path:
     )
     (reports / "failures.md").write_text("\n".join(f"- cycle {r.get('cycle')}: {r.get('reason')}" for r in rejected) + "\n")
     (reports / "accepted_patterns.md").write_text("\n".join(f"- cycle {r.get('cycle')}: {r.get('reason')}" for r in accepted) + "\n")
+    (reports / "paper_fidelity.md").write_text(
+        "\n".join(
+            [
+                "# Paper-Fidelity Summary",
+                "",
+                "| Agent | Decisions | Accept/Keep | Reject |",
+                "| --- | --- | --- | --- |",
+                *[
+                    f"| `{agent}` | {sum(1 for r in records if r.get('agent') == agent)} | {sum(1 for r in accepted if r.get('agent') == agent)} | {sum(1 for r in rejected if r.get('agent') == agent)} |"
+                    for agent in agents
+                ],
+                "",
+                "## Metric Files",
+                "",
+                "- `correctness.json`: adapter-owned correctness summary",
+                "- `qor.json`: adapter-owned QoR summary",
+                "- `perf.json`: adapter-owned performance summary",
+                "- `reward.json`: adapter-owned reward and optional decision summary",
+                "",
+            ]
+        )
+    )
     return summary
 
 
@@ -433,13 +456,17 @@ def propose_rules(config_path: Path) -> Path:
     repo = project_repo(config_path)
     proposal_id = datetime.now(timezone.utc).strftime("rule-%Y%m%d-%H%M%S")
     path = _proposal_dir(repo) / f"{proposal_id}.md"
+    history = read_history(repo)[-20:]
+    repeated = sorted({r.get("reason") for r in history if sum(1 for x in history if x.get("reason") == r.get("reason")) >= 2 and r.get("reason")})
     lines = [
         f"# Rule Proposal: {proposal_id}",
         "",
+        "Safety: strict",
+        "",
         "## Candidate Rule Updates",
         "",
+        *([f"- Repeated `{reason}` failures require the next prompt to state a concrete prevention step before coding." for reason in repeated] or ["- Keep patches small, reversible, and tied to one measured hypothesis."]),
         "- Keep evaluator scripts, benchmark data, and reward logic outside candidate edit scope.",
-        "- Prefer small reversible patches tied to one measured hypothesis.",
         "",
         "## Recent Evidence",
         "",
@@ -460,10 +487,17 @@ def accept_rule(config_path: Path, proposal_id: str) -> Path:
     proposal = _proposal_dir(repo) / f"{proposal_id}.md"
     if not proposal.exists():
         raise ValueError(f"rule proposal not found: {proposal_id}")
+    text = proposal.read_text()
+    if "Safety: strict" not in text:
+        raise ValueError("rule proposal missing Safety: strict marker")
+    lower = text.lower()
+    for token in ["skip checks", "bypass", "disable guard", "weaken", "edit evaluator", "edit reward"]:
+        if token in lower:
+            raise ValueError(f"unsafe rule proposal token: {token}")
     rulebase = repo / cfg.rulebase.path
     rulebase.parent.mkdir(parents=True, exist_ok=True)
     existing = rulebase.read_text() if rulebase.exists() else "# Rulebase\n"
-    rulebase.write_text(existing.rstrip() + "\n\n" + proposal.read_text().rstrip() + "\n")
+    rulebase.write_text(existing.rstrip() + "\n\n" + text.rstrip() + "\n")
     append_event(repo, "rules", "rule_accepted", 0, 0, "", {"proposal": proposal_id})
     return rulebase
 

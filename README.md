@@ -73,8 +73,8 @@ repair:
   Receives the failed gate stdout/stderr and attempts a bounded fix.
 
 rulebase:
-  Reserved role identity for rule evolution.
-  Today, rule proposals are file-backed and human-approved, not autonomous.
+  Evidence-based rule proposal identity.
+  Proposals are file-backed, safety-checked, and require explicit human approval.
 
 code_understanding:
   Optional. Runs through evo understand --agent to enrich deterministic code memory.
@@ -201,7 +201,7 @@ Compare pooled candidates without promoting:
 evo compare --config examples/abc/evo.yaml --cycle 1
 ```
 
-The report is written to `.evo/reports/compare-cycle-001.md` and recommends the highest numeric `evaluator_results.reward.score` when present.
+The report is written to `.evo/reports/compare-cycle-001.md` and recommends the highest numeric `evaluator_results.reward.score` when present. `reward.json` may also set `decision` to `accept`, `keep`, or `reject`; `keep` preserves a candidate without auto-promotion.
 
 Write long-running summary reports:
 
@@ -236,7 +236,7 @@ evo understand --config examples/abc/evo.yaml --agent
 evo understand --config examples/abc/evo.yaml --module src/map/ --changed-only
 ```
 
-This writes deterministic memory under `.evo/memory/code/`, including module summaries, invariants, extension points, and workflow notes for build, regression, benchmark, and reward commands. Use `--agent` to ask Codex to enrich `.evo/memory/code/agent_notes.md` while preserving deterministic memory as the baseline.
+This writes deterministic memory under `.evo/memory/code/`, including module summaries, invariants, extension points, workflow notes, and cycle-0 bootstrap docs under `.evo/memory/code/bootstrap/`. Bootstrap docs include repository profile, build conventions, command interfaces, subsystem map, safe edit protocol, prior-study notes, and adapter tutorial memory. Use `--agent` to ask Codex to enrich `.evo/memory/code/agent_notes.md` while preserving deterministic memory as the baseline.
 
 ## Local GUI
 
@@ -299,4 +299,4 @@ evo rules accept rule-YYYYMMDD-HHMMSS --config examples/abc/evo.yaml
 evo rules reject rule-YYYYMMDD-HHMMSS "not general enough" --config examples/abc/evo.yaml
 ```
 
-Accepted proposals append to `.evo/memory/rulebase.md` and are injected into future prompts when memory is enabled.
+Accepted proposals append to `.evo/memory/rulebase.md` and are injected into future prompts when memory is enabled. Rule acceptance requires a `Safety: strict` marker and rejects unsafe proposal text.
