@@ -5,6 +5,7 @@ import argparse
 
 from evoharness.pipeline.cycle import run_cycles
 from evoharness.promote import promote_cycle
+from evoharness.session import add_session_comment, session_status, set_session_status
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -18,6 +19,10 @@ def build_parser() -> argparse.ArgumentParser:
     promote.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
     promote.add_argument("--cycle", type=int, required=True)
     promote.add_argument("--candidate", type=int, default=1)
+    session = subparsers.add_parser("session", help="inspect or steer a local evolution session")
+    session.add_argument("action", choices=["status", "comment", "pause", "resume"])
+    session.add_argument("text", nargs="*")
+    session.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
     return parser
 
 
@@ -27,6 +32,15 @@ def main() -> None:
         run_cycles(config_path=args.config, cycles=args.cycles, human_review=args.human_review)
     if args.command == "promote":
         promote_cycle(config_path=args.config, cycle=args.cycle, candidate_index=args.candidate)
+    if args.command == "session":
+        if args.action == "status":
+            print(session_status(args.config))
+        if args.action == "comment":
+            print(add_session_comment(args.config, " ".join(args.text)))
+        if args.action == "pause":
+            print(set_session_status(args.config, "paused"))
+        if args.action == "resume":
+            print(set_session_status(args.config, "running"))
 
 
 if __name__ == "__main__":

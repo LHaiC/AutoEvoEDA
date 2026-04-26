@@ -5,6 +5,7 @@ from typing import Any
 import json
 
 from evoharness.config import EvoConfig
+from evoharness.session import recent_inbox
 
 
 def _read_if_present(path: Path) -> str:
@@ -53,6 +54,14 @@ def render_prompt(base_prompt: str, repo: Path, cfg: EvoConfig) -> str:
         lessons = _tail_lines(repo / cfg.memory.lessons, cfg.memory.inject_recent_cycles)
         if lessons:
             sections.extend(["", "## Recent lessons", *lessons])
+
+        inbox = recent_inbox(repo, cfg.memory.inject_recent_cycles)
+        if inbox:
+            sections.extend(["", "## Recent human session comments", *[item["text"] for item in inbox]])
+
+        roadmap = _read_if_present(repo / ".evo" / "roadmap.md")
+        if roadmap:
+            sections.extend(["", "## Evolution roadmap", roadmap])
 
         sections.extend(
             [

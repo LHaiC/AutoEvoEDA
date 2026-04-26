@@ -11,7 +11,8 @@ from evoharness.human import review_candidate
 from evoharness.memory import append_lesson, render_prompt, render_repair_prompt
 from evoharness.phase_docs import write_benchmark_doc, write_context_doc, write_decision_doc, write_implement_doc, write_propose_doc
 from evoharness.pipeline.runner import CommandResult, run_cmd
-from evoharness.reports import write_cycle_summary
+from evoharness.reports import write_cycle_summary, write_project_indexes
+from evoharness.session import assert_not_paused, ensure_session
 from evoharness.state import append_history
 from evoharness.workspace.git import Candidate, commit_candidate, create_candidate_worktree
 from evoharness.workspace.guard import GuardResult, check_patch_scope
@@ -194,15 +195,20 @@ def run_one_cycle(
 
 
 def run_cycles(config_path: Path, cycles: int, human_review: bool = False) -> None:
+    assert_not_paused(config_path)
     consecutive_rejects = 0
     scheduled_candidates = 0
     cfg = load_config(config_path)
+    repo = (config_path.parent / cfg.project.repo).resolve()
+    ensure_session(repo)
+    write_project_indexes(repo)
     pool_size = cfg.pool.size if cfg.pool.enabled else 1
     max_cycles = cfg.budget.max_cycles if cfg.budget.max_cycles > 0 else cycles
     stop_cycles = min(cycles, max_cycles)
     for cycle in range(1, stop_cycles + 1):
         for candidate_index in range(1, pool_size + 1):
             if cfg.budget.max_candidates > 0 and scheduled_candidates >= cfg.budget.max_candidates:
+                write_project_indexes(repo)
                 return
             scheduled_candidates += 1
             record = run_one_cycle(config_path, cfg, cycle, candidate_index, pool_size, human_review)
@@ -211,4 +217,6 @@ def run_cycles(config_path: Path, cycles: int, human_review: bool = False) -> No
             else:
                 consecutive_rejects = 0
             if cfg.human.stop_after_consecutive_rejects > 0 and consecutive_rejects >= cfg.human.stop_after_consecutive_rejects:
+                write_project_indexes(repo)
                 return
+    write_project_indexes(repo)
