@@ -55,6 +55,8 @@ pipeline:
 
 `workspace.repos[*].allowed_paths` are local to that child repo. `guards.allowed_paths` are candidate-root paths prefixed by repo name, for example `mapper/src/`.
 
+`evo understand` uses the same mapping: `mapper/src/` is read from `source-workspace/mapper/src/`. Non-repo directories should be declared through `workspace.materialize.copy`, `workspace.materialize.symlink`, or non-repo `guards.allowed_paths` so they are indexed from `workspace.source_root`.
+
 ## Runner Contract
 
 Keep code editing and evaluator execution separate:

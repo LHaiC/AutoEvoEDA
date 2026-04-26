@@ -20,6 +20,8 @@ evo understand --config evo.yaml --agent
 evo understand --config evo.yaml --module src/map/ --changed-only
 ```
 
+For `workspace.mode: multi_repo`, `evo understand` scans child repos from `workspace.source_root/<repo.path>` and scans configured non-repo assets from `workspace.materialize` or non-repo `guards.allowed_paths`.
+
 Run local evolution:
 
 ```bash

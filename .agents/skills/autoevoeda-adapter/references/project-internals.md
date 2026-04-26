@@ -10,7 +10,7 @@ Read this before editing the AutoEvoEDA framework code. Keep framework changes s
 - `autoevoeda/artifacts.py`: `.evo/` artifact APIs. Owns run directories, events, history, phase docs, reports, session state, active-run marker, agent registry, rule proposals, promotion, compare, and worktree cleanup helpers.
 - `autoevoeda/agents/codex.py`: Codex CLI subprocess backend and optional native resume call path.
 - `autoevoeda/memory.py`: prompt assembly and durable lesson injection.
-- `autoevoeda/understand.py`: deterministic code-understanding memory and optional understanding-agent enrichment.
+- `autoevoeda/understand.py`: deterministic code-understanding memory and optional understanding-agent enrichment. In multi-repo mode, it scans `workspace.source_root` child repos and configured non-repo asset directories, not the adapter repo.
 - `autoevoeda/daemon.py`: long-running loop, daemon lock, heartbeat, pause/resume checks, and consecutive-reject stop.
 - `autoevoeda/human.py`: terminal human checkpoint prompts.
 - `autoevoeda/gui.py`: local read/control dashboard over `.evo` files.

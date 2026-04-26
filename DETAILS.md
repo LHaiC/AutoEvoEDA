@@ -99,7 +99,7 @@ This differs from the paper. The paper uses a global planning agent plus three A
 
 ABC build, CEC, benchmark, QoR, and reward scripts are adapter-owned. The framework keeps placeholders in `examples/abc/` and focuses on reusable orchestration, agent roles, guards, memory, events, run artifacts, and rulebase contracts.
 
-Framework-level paper-alignment scaffolding is implemented for domain agents, per-agent guard scopes, planner-selected agents, structured proposal artifacts, cycle-0 bootstrap memory, reward-driven keep/reject decisions, rule proposals with safety checks, reproducibility metadata, and paper-fidelity reports. Full experimental reproduction still requires a real ABC adapter and benchmark environment.
+Framework-level paper-alignment scaffolding is implemented for domain agents, per-agent guard scopes, planner-selected agents, structured proposal artifacts, cycle-0 bootstrap memory, reward-driven keep/reject decisions, rule proposals with safety checks, and reproducibility metadata. Full experimental reproduction still requires a real ABC adapter and benchmark environment.
 
 
 ## Multi-Repo Workspaces
@@ -130,6 +130,8 @@ pipeline:
 ```
 
 Pipeline commands run with `cwd=$AUTOEVO_CANDIDATE_ROOT` and receive `AUTOEVO_ADAPTER_ROOT` and `AUTOEVO_CANDIDATE_ROOT` in the environment. Promotion fast-forwards each changed child repo into its configured champion branch. See `examples/multi_repo/`.
+
+`evo understand` also follows this layout: child-repo module indexes are read from `workspace.source_root/<repo.path>` using each child repo's git index, while configured non-repo assets from `workspace.materialize.copy`, `workspace.materialize.symlink`, or non-repo `guards.allowed_paths` are scanned from `workspace.source_root` as files.
 
 Use `runner` to document and enforce evaluator preflight requirements separately from the code-editing Codex agent:
 
@@ -311,7 +313,7 @@ evo understand --config examples/abc/evo.yaml --agent
 evo understand --config examples/abc/evo.yaml --module src/map/ --changed-only
 ```
 
-This writes deterministic memory under `.evo/memory/code/`, including module summaries, invariants, extension points, workflow notes, and cycle-0 bootstrap docs under `.evo/memory/code/bootstrap/`. Bootstrap docs include repository profile, build conventions, command interfaces, subsystem map, safe edit protocol, prior-study notes, and adapter tutorial memory. Use `--agent` to ask Codex to enrich `.evo/memory/code/agent_notes.md` while preserving deterministic memory as the baseline.
+This writes deterministic memory under `.evo/memory/code/`, including module summaries, invariants, workflow notes, and cycle-0 bootstrap docs under `.evo/memory/code/bootstrap/`. In multi-repo mode, module paths such as `mapper/src/` are resolved against the child repo in `workspace.source_root`, not the adapter repo. Use `--agent` to ask Codex to enrich `.evo/memory/code/agent_notes.md` while preserving deterministic memory as the baseline.
 
 ## Local GUI
 
