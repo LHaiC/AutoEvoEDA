@@ -48,6 +48,8 @@ def build_parser() -> argparse.ArgumentParser:
     understand = subparsers.add_parser("understand", help="write deterministic code-understanding memory")
     understand.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
     understand.add_argument("--agent", action="store_true", help="enrich deterministic memory with Codex")
+    understand.add_argument("--module", action="append", dest="modules", help="limit understanding to one allowed prefix")
+    understand.add_argument("--changed-only", action="store_true", help="index changed files under selected modules")
     gui = subparsers.add_parser("gui", help="serve a read-only local dashboard")
     gui.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
     gui.add_argument("--host", default="127.0.0.1")
@@ -105,7 +107,7 @@ def main() -> None:
         if args.action == "resume":
             print(set_session_status(args.config, "running"))
     if args.command == "understand":
-        run_understand(args.config, use_agent=args.agent)
+        run_understand(args.config, use_agent=args.agent, modules=args.modules, changed_only=args.changed_only)
     if args.command == "gui":
         serve_gui(args.config, args.host, args.port)
 

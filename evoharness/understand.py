@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 import re
 
@@ -29,8 +30,9 @@ def _memory_dir(repo: Path) -> Path:
     return path
 
 
-def _tracked_files(repo: Path, prefix: str) -> list[str]:
-    out = git(["ls-files", prefix], cwd=repo)
+def _tracked_files(repo: Path, prefix: str, changed_only: bool = False) -> list[str]:
+    args = ["ls-files", "--modified", "--others", "--exclude-standard", prefix] if changed_only else ["ls-files", prefix]
+    out = git(args, cwd=repo)
     return out.splitlines() if out else []
 
 
@@ -39,12 +41,14 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text)
 
 
-def _module_doc(repo: Path, prefix: str) -> str:
-    files = _tracked_files(repo, prefix)
+def _module_doc(repo: Path, prefix: str, changed_only: bool) -> str:
+    files = _tracked_files(repo, prefix, changed_only)
     sample = files[:30]
     return "\n".join(
         [
             f"# Module: {prefix}",
+            "",
+            f"Updated at: {datetime.now(timezone.utc).isoformat()}",
             "",
             "## Responsibility",
             "",
@@ -81,6 +85,8 @@ def _understanding_prompt(memory: Path) -> str:
         "index.md",
         "architecture.md",
         "build_system.md",
+        "invariants.md",
+        "extension_points.md",
         "workflows/build.md",
         "workflows/regression.md",
         "workflows/benchmark.md",
@@ -91,17 +97,22 @@ def _understanding_prompt(memory: Path) -> str:
     return "\n".join(parts).rstrip() + "\n"
 
 
-def run_understand(config_path: Path, use_agent: bool = False) -> None:
+def run_understand(
+    config_path: Path,
+    use_agent: bool = False,
+    modules: list[str] | None = None,
+    changed_only: bool = False,
+) -> None:
     cfg = load_config(config_path)
     repo = _repo(config_path, cfg)
     memory = _memory_dir(repo)
 
-    module_paths = cfg.guards.allowed_paths
+    module_paths = modules or cfg.guards.allowed_paths
     module_links = []
     for prefix in module_paths:
         name = _safe_name(prefix) + ".md"
         module_links.append((prefix, name))
-        _write(memory / "modules" / name, _module_doc(repo, prefix))
+        _write(memory / "modules" / name, _module_doc(repo, prefix, changed_only))
 
     understanding_memory = read_agent_memory(repo, cfg.agents.code_understanding.session_id)
     _write(
@@ -124,6 +135,8 @@ def run_understand(config_path: Path, use_agent: bool = False) -> None:
                 "",
                 "- `architecture.md`",
                 "- `build_system.md`",
+                "- `invariants.md`",
+                "- `extension_points.md`",
                 "",
                 "## Understanding Agent Memory",
                 "",
@@ -174,6 +187,38 @@ def run_understand(config_path: Path, use_agent: bool = False) -> None:
                 "- `CMakeLists.txt`",
                 "- `module.make`",
                 "- `pyproject.toml`",
+                "",
+            ]
+        ),
+    )
+
+    _write(
+        memory / "invariants.md",
+        "\n".join(
+            [
+                "# Invariants",
+                "",
+                "- Build, regression, benchmark, and reward scripts define acceptance.",
+                "- Candidate patches must not weaken evaluator scripts or golden data.",
+                "- Correctness gates run before reward is considered.",
+                "",
+            ]
+        ),
+    )
+
+    _write(
+        memory / "extension_points.md",
+        "\n".join(
+            [
+                "# Extension Points",
+                "",
+                "## Allowed Edit Roots",
+                "",
+                *[f"- `{path}`" for path in cfg.guards.allowed_paths],
+                "",
+                "## Adapter-Owned Logic",
+                "",
+                *[f"- `{path}`" for path in cfg.guards.forbidden_paths],
                 "",
             ]
         ),

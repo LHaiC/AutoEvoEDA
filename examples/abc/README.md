@@ -261,3 +261,14 @@ evo rules accept rule-YYYYMMDD-HHMMSS --config evo.yaml
 ```
 
 Accepted rules are appended to `.evo/memory/rulebase.md`; rejected proposals remain in `.evo/rules/` as evidence.
+
+## Code Understanding Memory
+
+Seed or refresh code memory before long daemon runs:
+
+```bash
+evo understand --config evo.yaml
+evo understand --config evo.yaml --module src/map/ --changed-only
+```
+
+This writes module summaries, invariants, extension points, and workflow notes under `.evo/memory/code/`.
