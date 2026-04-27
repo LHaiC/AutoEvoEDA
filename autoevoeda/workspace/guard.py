@@ -2,9 +2,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import re
 
 from autoevoeda.config import WorkspaceConfig
 from autoevoeda.workspace.git import Candidate, changed_files, changed_line_count, git
+
+SUSPICIOUS_PATTERNS = [
+    ("skip", re.compile(rb"\b(skip_(correctness|regression|validation|check|checks|test|tests|perf)|--skip)\b")),
+    ("bypass", re.compile(rb"\bbypass\b")),
+    ("return true", re.compile(rb"\breturn\s+true\b")),
+    ("NDEBUG", re.compile(rb"\bNDEBUG\b")),
+    ("benchmark ==", re.compile(rb"\bbenchmark\s*==")),
+    ("design_name ==", re.compile(rb"\bdesign_name\s*==")),
+]
 
 
 @dataclass(frozen=True)
@@ -28,11 +38,29 @@ def _check_files(files: list[str], allowed_paths: list[str], forbidden_paths: li
     return "ok"
 
 
-def _check_diff(repo: Path) -> str:
-    diff = git(["diff"], cwd=repo)
-    for token in ["skip", "bypass", "return true", "NDEBUG", "benchmark ==", "design_name =="]:
-        if token in diff:
-            return f"suspicious_pattern:{token}"
+def _check_diff(repo: Path, files: list[str] | None = None) -> str:
+    args = ["diff", "--unified=0"]
+    if files is not None:
+        if not files:
+            return "ok"
+        args.extend(["--", *files])
+    diff = git(args, cwd=repo).encode()
+    for line in diff.splitlines():
+        if not line.startswith(b"+") or line.startswith(b"+++"):
+            continue
+        for label, pattern in SUSPICIOUS_PATTERNS:
+            if pattern.search(line[1:]):
+                return f"suspicious_pattern:{label}"
+    tracked = set(git(["ls-files"], cwd=repo).splitlines())
+    for file in files or []:
+        if file in tracked:
+            continue
+        path = repo / file
+        if path.is_file():
+            for line in path.read_bytes().splitlines():
+                for label, pattern in SUSPICIOUS_PATTERNS:
+                    if pattern.search(line):
+                        return f"suspicious_pattern:{label}"
     return "ok"
 
 
@@ -65,11 +93,11 @@ def check_candidate_scope(
         reason = _check_files(repo_files, repo_cfg.allowed_paths, [*forbidden_paths, *repo_cfg.forbidden_paths])
         if reason != "ok":
             return GuardResult(False, f"{repo.name}:{reason}", len(files) + len(repo_files), lines)
-        diff_reason = _check_diff(repo.path)
+        lines += changed_line_count(repo.path, repo_files)
+        diff_reason = _check_diff(repo.path, repo_files)
         if diff_reason != "ok":
             return GuardResult(False, f"{repo.name}:{diff_reason}", len(files) + len(repo_files), lines)
         files.extend(f"{repo.name}/{file}" for file in repo_files)
-        lines += changed_line_count(repo.path)
     reason = _check_files(files, allowed_paths, []) if allowed_paths else "ok"
     if reason != "ok":
         return GuardResult(False, reason, len(files), lines)
@@ -96,7 +124,7 @@ def _finish_guard(
     reason = _check_files(files, allowed_paths, forbidden_paths)
     if reason != "ok":
         return GuardResult(False, reason, len(files), lines)
-    diff_reason = _check_diff(repo)
+    diff_reason = _check_diff(repo, files)
     if diff_reason != "ok":
         return GuardResult(False, diff_reason, len(files), lines)
     return GuardResult(True, "ok", len(files), lines)

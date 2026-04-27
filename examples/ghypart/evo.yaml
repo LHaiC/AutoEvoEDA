@@ -1,0 +1,68 @@
+schema_version: "1.0"
+
+project:
+  name: ghypart.public
+  repo: .
+
+agent:
+  prompt_file: prompts/coder.md
+
+workspace:
+  mode: multi_repo
+  source_root: ..
+  worktree_root: ../.evo-worktrees
+  repos:
+    - name: ghypart
+      path: gHyPart_TACO
+      champion_branch: master
+      allowed_paths:
+        - include/
+        - kernels/
+        - no_uvm_impl/
+        - use_uvm_impl/
+        - utility/
+        - CMakeLists.txt
+      forbidden_paths:
+        - benchmark_set/
+        - build/
+        - results/
+        - scripts/
+        - cpu_works/
+  materialize:
+    copy: []
+    symlink: []
+
+guards:
+  max_changed_files: 8
+  max_changed_lines: 600
+  allowed_paths:
+    - ghypart/include/
+    - ghypart/kernels/
+    - ghypart/no_uvm_impl/
+    - ghypart/use_uvm_impl/
+    - ghypart/utility/
+    - ghypart/CMakeLists.txt
+  forbidden_paths:
+    - scripts/
+    - results/
+    - golden/
+    - ghypart/benchmark_set/
+    - ghypart/build/
+    - ghypart/results/
+    - ghypart/scripts/
+    - ghypart/cpu_works/
+
+pipeline:
+  build: bash "$AUTOEVO_ADAPTER_ROOT/scripts/build.sh"
+  regression: bash "$AUTOEVO_ADAPTER_ROOT/scripts/run_regression.sh"
+  compare_regression: python "$AUTOEVO_ADAPTER_ROOT/scripts/compare_regression.py"
+  perf: bash "$AUTOEVO_ADAPTER_ROOT/scripts/run_perf.sh"
+  reward: python "$AUTOEVO_ADAPTER_ROOT/scripts/reward.py"
+
+memory:
+  enabled: true
+
+roles:
+  planner_prompt: prompts/planner.md
+  coder_prompt: prompts/coder.md
+  reviewer_prompt: prompts/reviewer.md

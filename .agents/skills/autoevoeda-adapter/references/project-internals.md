@@ -84,7 +84,7 @@ Domain-agent Codex output must include `hypothesis:`, `target_files:`, `expected
 - Do not add broad catch-all exception paths; failures should surface unless a command has a narrow, deterministic recovery rule.
 - Keep evaluator scripts, benchmark data, golden outputs, CI, and config outside candidate edit scope by default.
 - Treat `runner.sandbox` as an evaluator environment contract, not a privilege escalation mechanism from a restricted parent process.
-- Avoid broad fallback behavior. Prefer deterministic failure with a clear reason.
+- Avoid broad silent-recovery behavior. Prefer deterministic failure with a clear reason.
 
 ## Verification For Framework Edits
 

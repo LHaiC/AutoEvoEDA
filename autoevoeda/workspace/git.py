@@ -110,12 +110,29 @@ def changed_files(repo: Path) -> list[str]:
     return sorted({*tracked, *_untracked_files(repo)})
 
 
+def _worktree_diff(repo: Path, files: list[str] | None = None) -> str:
+    if files is not None and not files:
+        return ""
+    args = ["diff"]
+    if files is not None:
+        args.extend(["--", *files])
+    parts = [git(args, cwd=repo)]
+    selected = set(files) if files is not None else None
+    for file in _untracked_files(repo):
+        if selected is not None and file not in selected:
+            continue
+        if (repo / file).is_file():
+            parts.append(git(["diff", "--no-index", "--", "/dev/null", file], cwd=repo, check=False))
+    return "\n".join(part for part in parts if part)
+
+
 def candidate_diff(candidate: Candidate) -> str:
     if not candidate.repos:
-        return git(["diff"], cwd=candidate.path)
+        return _worktree_diff(candidate.path)
     parts = []
     for repo in candidate.repos:
-        diff = git(["diff"], cwd=repo.path)
+        files = changed_files(repo.path)
+        diff = _worktree_diff(repo.path, files)
         if diff:
             parts.extend([f"# repo: {repo.name}", diff])
     return "\n".join(parts)
@@ -130,8 +147,13 @@ def candidate_changed_files(candidate: Candidate) -> list[str]:
     return rows
 
 
-def changed_line_count(repo: Path) -> int:
-    out = git(["diff", "--numstat"], cwd=repo)
+def changed_line_count(repo: Path, files: list[str] | None = None) -> int:
+    args = ["diff", "--numstat"]
+    if files is not None:
+        if not files:
+            return 0
+        args.extend(["--", *files])
+    out = git(args, cwd=repo)
     total = 0
     for line in out.splitlines():
         added, deleted, _path = line.split("\t", 2)
@@ -139,7 +161,11 @@ def changed_line_count(repo: Path) -> int:
             total += int(added)
         if deleted != "-":
             total += int(deleted)
-    for path in _untracked_files(repo):
+    untracked = _untracked_files(repo)
+    if files is not None:
+        allowed = set(files)
+        untracked = [path for path in untracked if path in allowed]
+    for path in untracked:
         file_path = repo / path
         if file_path.is_file():
             total += len(file_path.read_bytes().splitlines())
@@ -150,9 +176,14 @@ def has_uncommitted_changes(repo: Path) -> bool:
     return bool(git(["status", "--porcelain"], cwd=repo))
 
 
-def commit_repo(repo: Path, message: str) -> None:
+def commit_repo(repo: Path, message: str, files: list[str] | None = None) -> None:
     if has_uncommitted_changes(repo):
-        git(["add", "-A"], cwd=repo)
+        if files is None:
+            git(["add", "-A"], cwd=repo)
+        elif files:
+            git(["add", "--", *files], cwd=repo)
+        else:
+            return
         git(["commit", "-m", message], cwd=repo)
 
 
@@ -160,6 +191,6 @@ def commit_candidate(candidate: Candidate, cycle: int) -> None:
     message = f"evo: candidate cycle {cycle:03d}"
     if candidate.repos:
         for repo in candidate.repos:
-            commit_repo(repo.path, message)
+            commit_repo(repo.path, message, changed_files(repo.path))
     else:
         commit_repo(candidate.path, message)

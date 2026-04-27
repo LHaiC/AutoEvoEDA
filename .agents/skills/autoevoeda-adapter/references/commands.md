@@ -85,4 +85,4 @@ Interrupt handling is explicit. If a run stops with an active checkpoint and no 
 evo run --config evo.yaml --continue --cycles 1
 ```
 
-`--continue` also resumes a paused session before scheduling. `--non-stop` means run until manually paused; it is not an exception-swallowing fallback.
+`--continue` also resumes a paused session before scheduling. `--non-stop` means run until manually paused; it is not an exception-swallowing recovery.

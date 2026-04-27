@@ -1,0 +1,3 @@
+[submodule "examples/gHyPart_TACO"]
+	path = examples/gHyPart_TACO
+	url = git@github.com:LHaiC/gHyPart_TACO.git

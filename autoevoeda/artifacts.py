@@ -640,7 +640,7 @@ def cleanup_worktrees(
             for info in repos.values():
                 args = ["worktree", "remove", str(info["path"])]
                 git(args[:2] + ["--force"] + args[2:] if force else args, cwd=Path(str(info["source"])))
-            shutil.rmtree(path, ignore_errors=True)
+            shutil.rmtree(path)
         else:
             args = ["worktree", "remove", str(path)]
             git(args[:2] + ["--force"] + args[2:] if force else args, cwd=repo)

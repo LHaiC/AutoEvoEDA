@@ -32,6 +32,6 @@ So adapter-owned scripts should usually be invoked through `$AUTOEVO_ADAPTER_ROO
 
 ## CUDA-Only Evaluators
 
-If a project benchmark is CUDA-only, do not use CPU fallback. Configure `runner.preflight` to call `scripts/cuda_preflight.sh`, and also source `require_cuda` inside golden generation, regression, and performance scripts when those scripts can be run directly. If CUDA is not visible, fail fast and do not generate golden data or reward scores.
+If a project benchmark is CUDA-only, do not use CPU substitute. Configure `runner.preflight` to call `scripts/cuda_preflight.sh`, and also source `require_cuda` inside golden generation, regression, and performance scripts when those scripts can be run directly. If CUDA is not visible, fail fast and do not generate golden data or reward scores.
 
 Candidate code agents should stay sandboxed and scoped by guards. Only the evaluator process needs access to host NVIDIA devices. `runner.sandbox: danger-full-access` records that requirement but cannot escape a restricted parent process; if the parent runner cannot see `/dev/nvidia*`, launch AutoEvoEDA from a full-access environment rather than widening the code-editing agent.
