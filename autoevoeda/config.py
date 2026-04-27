@@ -138,6 +138,7 @@ class AgentsConfig:
     coder: AgentRoleConfig
     reviewer: AgentRoleConfig
     repair: AgentRoleConfig
+    rulebase: AgentRoleConfig
     code_understanding: AgentRoleConfig
 
 
@@ -403,6 +404,7 @@ def load_config(path: Path) -> EvoConfig:
             coder=_agent_role(agents_data, "coder", "coder-main"),
             reviewer=_agent_role(agents_data, "reviewer", "reviewer-main"),
             repair=_agent_role(agents_data, "repair", "repair-main"),
+            rulebase=_agent_role(agents_data, "rulebase", "rulebase-main"),
             code_understanding=_agent_role(agents_data, "code_understanding", "understand-main"),
         ),
         domain_agents=domain_agents,

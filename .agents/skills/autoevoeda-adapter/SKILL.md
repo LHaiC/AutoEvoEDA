@@ -54,10 +54,11 @@ Read `references/evo-yaml.md`. For sibling-repo workspaces, also read `reference
 - `agent.sandbox` is for Codex code editing; `runner.sandbox` is for evaluator/pipeline requirements and should be paired with `runner.preflight` for CUDA-only runs.
 - `domain_agents` requires `multi_agent.planner: true` and `roles.planner_prompt`.
 - Stable `session_id` values are framework-level memory identities; native Codex resume is opt-in.
+- Add `agents.rulebase.session_id` when a project needs a named rule-evolution role; rule proposals are inactive until human accepted.
 
 ## 4. Explain commands and state
 
-Read `references/commands.md` before explaining how to run, continue, non-stop daemon mode, pause, resume, inspect `.evo/`, read `.evo/brief.md`, follow `.evo/agents/interactions.jsonl`, or promote candidates.
+Read `references/commands.md` before explaining how to run, continue, non-stop daemon mode, pause, resume, inspect the human inbox, review rule proposals, inspect `.evo/`, read `.evo/brief.md`, follow `.evo/agents/interactions.jsonl`, or promote candidates.
 
 For long local runs, copy or adapt `scripts/evo_nonstop_supervisor.sh` into the adapter's `scripts/` directory.
 

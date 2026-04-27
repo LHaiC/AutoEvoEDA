@@ -14,7 +14,9 @@ from autoevoeda.artifacts import (
     reject_rule,
     write_reports,
     add_session_comment,
+    clear_session_inbox,
     session_status,
+    session_inbox,
     set_session_status,
 )
 from autoevoeda.config import load_config
@@ -63,8 +65,9 @@ def build_parser() -> argparse.ArgumentParser:
     report = subparsers.add_parser("report", help="write long-running summary reports")
     report.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
     session = subparsers.add_parser("session", help="inspect or steer a local evolution session")
-    session.add_argument("action", choices=["status", "comment", "pause", "resume"])
+    session.add_argument("action", choices=["status", "comment", "inbox", "clear-inbox", "pause", "resume"])
     session.add_argument("text", nargs="*")
+    session.add_argument("--next-hint", default="")
     session.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
     understand = subparsers.add_parser("understand", help="run pre-evolution understanding workflow")
     understand.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
@@ -132,7 +135,12 @@ def main() -> None:
         if args.action == "status":
             print(session_status(args.config))
         if args.action == "comment":
-            print(add_session_comment(args.config, " ".join(args.text)))
+            print(add_session_comment(args.config, " ".join(args.text), args.next_hint))
+        if args.action == "inbox":
+            for item in session_inbox(args.config):
+                print(item)
+        if args.action == "clear-inbox":
+            print(clear_session_inbox(args.config))
         if args.action == "pause":
             print(set_session_status(args.config, "paused"))
         if args.action == "resume":

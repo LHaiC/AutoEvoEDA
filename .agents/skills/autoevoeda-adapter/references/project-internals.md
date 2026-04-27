@@ -40,15 +40,18 @@ Promotion is separate: `evo promote` fast-forwards the configured champion branc
 ## `.evo/` State Model
 
 - `.evo/runs/<run_id>/`: `00_context.md`, `01_propose.md`, `02_implement.md`, `03_benchmark.md`, `04_decision.md`, command stdout/stderr, `patch.diff`, `events.jsonl`, `evaluator_results.json`, `state.json`, `reproducibility.json`.
-- `.evo/brief.md`: concise shared history rebuilt from recent decisions and agent handoffs.
+- `.evo/brief.md`: concise shared history rebuilt from recent decisions, human inbox entries, rule proposals, and agent handoffs.
 - `.evo/events.jsonl`: global event stream.
 - `.evo/history.jsonl`: final candidate decisions and promotion records.
 - `.evo/session/state.json`: `running` or `paused`.
+- `.evo/session/inbox.jsonl`: human comments and next hints for prompt injection.
 - `.evo/session/active_run.json`: interrupt-safe active checkpoint; new work must refuse to start until abandoned or cleared.
 - `.evo/agents/<session_id>/`: role memory, transcript, last prompt, last response, per-call exchange files, optional Codex session events.
 - `.evo/agents/interactions.jsonl`: explicit cross-agent exchange log summarized by `.evo/brief.md`.
 - `.evo/runs/<run_id>/agent_flow.md`: per-run chain of planner/coder/reviewer/repair calls.
+- `.evo/rules/proposals/`: inactive rulebase patches awaiting human accept/reject.
 - `.evo/memory/`: project memory, lessons, agent handoffs, rejected ideas, accepted patterns, rulebase, and code-understanding docs.
+- `.evo/memory/code/coverage.json`: compact module coverage, source file counts, commit ids, confidence, staleness, and token-budget hints.
 
 ## Config Ownership
 
@@ -57,7 +60,7 @@ Promotion is separate: `evo promote` fast-forwards the configured champion branc
 ```text
 project, agent, workspace, guards, pipeline, result_files, memory, human,
 repair, roles, rulebase, pool, budget, agents, domain_agents, multi_agent, runner,
-promotion
+promotion, understanding
 ```
 
 If `domain_agents` is non-empty, config validation requires `multi_agent.planner: true` and `roles.planner_prompt`.
@@ -69,6 +72,7 @@ If `domain_agents` is non-empty, config validation requires `multi_agent.planner
 - `domain_agents`: optional specialist coders with their own prompt, session id, allowed paths, forbidden paths, and proposal requirements.
 - `reviewer`: optional advisory pass after guard and before gates; never replaces evaluator scripts.
 - `repair`: optional bounded pass after failed gates.
+- `rulebase`: stable identity for rule proposal review memory; proposals require human approval before activation.
 - `code_understanding`: role used by non-scaffold `evo understand` phases to write durable pre-evolution memory.
 
 Domain-agent Codex output must include `hypothesis:`, `target_files:`, `expected_metric_impact:`, and `rollback_risk:` so `cycle.py` can write `agent_proposal.json` and `agent_proposal.md`.

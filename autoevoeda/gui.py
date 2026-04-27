@@ -8,7 +8,7 @@ import json
 from urllib.parse import parse_qs
 
 from autoevoeda.config import load_config
-from autoevoeda.artifacts import add_session_comment, promote_cycle, set_session_status
+from autoevoeda.artifacts import accept_rule, add_session_comment, promote_cycle, reject_rule, set_session_status
 
 
 def _repo(config_path: Path) -> Path:
@@ -39,6 +39,8 @@ def render_dashboard(repo: Path) -> str:
     brief = _read(evo / "brief.md")
     roadmap = _read(evo / "roadmap.md")
     memory_index = _read(evo / "memory" / "code" / "index.md")
+    inbox = _read_jsonl(evo / "session" / "inbox.jsonl")
+    rules = sorted((evo / "rules" / "proposals").glob("*.md")) if (evo / "rules" / "proposals").exists() else []
     runs_dir = evo / "runs"
     runs = sorted([p.name for p in runs_dir.iterdir() if p.is_dir()]) if runs_dir.exists() else []
     rows = "".join(
@@ -65,6 +67,13 @@ def render_dashboard(repo: Path) -> str:
         f'<a href="/file/.evo/runs/{escape(name)}/events.jsonl">events</a></li>'
         for name in runs
     )
+    inbox_rows = "".join(f"<li>{escape(str(item.get('time', '')))}: {escape(str(item.get('text') or item.get('comment') or ''))}</li>" for item in inbox[-20:])
+    rule_rows = "".join(
+        f'<li><a href="/file/.evo/rules/proposals/{escape(path.name)}">{escape(path.stem)}</a> '
+        f'<form class="inline" method="post" action="/action/rule-accept"><input type="hidden" name="proposal" value="{escape(path.stem)}"><button>Accept</button></form> '
+        f'<form class="inline" method="post" action="/action/rule-reject"><input type="hidden" name="proposal" value="{escape(path.stem)}"><input name="comment" placeholder="comment"><button>Reject</button></form></li>'
+        for path in rules
+    )
     return f"""<!doctype html>
 <html>
 <head>
@@ -80,6 +89,7 @@ section {{ background: white; border: 1px solid #ddd4c8; border-radius: 12px; pa
 table {{ width: 100%; border-collapse: collapse; }}
 th, td {{ border-bottom: 1px solid #e6ded4; padding: 6px; text-align: left; vertical-align: top; }}
 pre {{ white-space: pre-wrap; background: #f8f8f8; border: 1px solid #eee; padding: 12px; border-radius: 8px; max-height: 360px; overflow: auto; }}
+form.inline {{ display: inline; }}
 a {{ color: #0f5f8f; }}
 </style>
 </head>
@@ -88,11 +98,13 @@ a {{ color: #0f5f8f; }}
 <p>Local control view for <code>{escape(str(repo))}</code></p>
 <section><h2>Workflow</h2>{_workflow_graph()}</section>
 <section><h2>Controls</h2>
-<form method="post" action="/action/comment"><input name="text" placeholder="human steering comment" size="80"> <button>Comment</button></form>
+<form method="post" action="/action/comment"><input name="text" placeholder="human steering comment" size="60"> <input name="next_hint" placeholder="next hint" size="40"> <button>Comment</button></form>
 <form method="post" action="/action/pause"><button>Pause</button></form>
 <form method="post" action="/action/resume"><button>Resume</button></form>
 <form method="post" action="/action/promote"><input name="cycle" placeholder="cycle" size="6"> <input name="candidate" placeholder="candidate" size="8" value="1"> <button>Promote</button></form>
 </section>
+<section><h2>Human Inbox</h2><ul>{inbox_rows}</ul></section>
+<section><h2>Rule Proposals</h2><ul>{rule_rows}</ul></section>
 <section><h2>Session State</h2><pre>{escape(state)}</pre></section>
 <section><h2>History</h2><table><tr><th>Cycle</th><th>Candidate</th><th>Decision</th><th>Reason</th><th>Branch</th></tr>{rows}</table></section>
 <section><h2>Recent Events</h2><table><tr><th>Time</th><th>Type</th><th>Run</th><th>Payload</th></tr>{event_rows}</table></section>
@@ -141,7 +153,7 @@ def serve_gui(config_path: Path, host: str, port: int) -> None:
             length = int(self.headers.get("Content-Length", "0"))
             data = parse_qs(self.rfile.read(length).decode())
             if self.path == "/action/comment":
-                add_session_comment(config_path, data.get("text", [""])[0])
+                add_session_comment(config_path, data.get("text", [""])[0], data.get("next_hint", [""])[0])
                 return self._redirect()
             if self.path == "/action/pause":
                 set_session_status(config_path, "paused")
@@ -153,6 +165,12 @@ def serve_gui(config_path: Path, host: str, port: int) -> None:
                 cycle = int(data.get("cycle", ["0"])[0])
                 candidate = int(data.get("candidate", ["1"])[0])
                 promote_cycle(config_path, cycle, candidate)
+                return self._redirect()
+            if self.path == "/action/rule-accept":
+                accept_rule(config_path, data.get("proposal", [""])[0])
+                return self._redirect()
+            if self.path == "/action/rule-reject":
+                reject_rule(config_path, data.get("proposal", [""])[0], data.get("comment", [""])[0])
                 return self._redirect()
             self.send_response(404)
             self.end_headers()

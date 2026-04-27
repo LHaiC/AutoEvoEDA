@@ -124,11 +124,13 @@ agents:
     session_id: reviewer-main
   repair:
     session_id: repair-main
+  rulebase:
+    session_id: rulebase-main
   code_understanding:
     session_id: understand-main
 ```
 
-`scaffold` writes `.evo/memory/code/understanding_targets.json` from `understanding`. The target docs themselves are agent-owned and should not exist as scaffold placeholders.
+`scaffold` writes `.evo/memory/code/coverage.json` and `.evo/memory/code/understanding_targets.json` from `understanding`. The target docs themselves are agent-owned and should not exist as scaffold placeholders.
 
 ## Multi-Repo Workspaces
 
@@ -146,7 +148,7 @@ agent:
     model_reasoning_effort: high
 ```
 
-`agent.config` maps to repeated `codex exec --config key=value` arguments and should contain scalar or list values. `agent.profile` applies to fresh `codex exec`; native `codex exec resume` does not currently expose `--profile`, so put resume-critical options in `agent.config`.
+`agent.config` maps to repeated `codex exec --config key=value` arguments and should contain scalar or list values. `agent.profile` applies to fresh `codex exec`; native `codex exec resume` does not currently expose `--profile`, so put resume-critical options in `agent.config`. If resume fails, AutoEvoEDA records `resume_failed_new` and starts a fresh invocation using file-backed memory.
 
 ## Runner Contract
 

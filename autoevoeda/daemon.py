@@ -5,7 +5,7 @@ import json
 import os
 import time
 
-from autoevoeda.artifacts import append_event, ensure_session, read_history, read_state, set_session_status, write_project_indexes
+from autoevoeda.artifacts import append_event, compare_cycle, ensure_session, read_history, read_state, set_session_status, write_project_indexes
 from autoevoeda.config import EvoConfig, load_config
 from autoevoeda.pipeline.cycle import assert_no_interrupted_run, run_one_cycle
 
@@ -75,6 +75,8 @@ def run_daemon(config_path: Path, max_cycles: int = 0, sleep_s: float = 60.0, hu
                     write_project_indexes(repo)
                     return
 
+            if pool_size > 1:
+                compare_cycle(config_path, cycle)
             completed_cycles += 1
             append_event(repo, "daemon", "daemon_cycle_finished", cycle, 0, "", {"completed_cycles": completed_cycles})
             write_project_indexes(repo)

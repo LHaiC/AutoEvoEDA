@@ -46,7 +46,9 @@ Run a file-controlled long loop:
 evo daemon --config evo.yaml --max-cycles 10 --sleep-s 30
 evo daemon --config evo.yaml --non-stop --sleep-s 60
 evo session status --config evo.yaml
-evo session comment --config evo.yaml "steering note"
+evo session comment --config evo.yaml --next-hint "next focused hint" "steering note"
+evo session inbox --config evo.yaml
+evo session clear-inbox --config evo.yaml
 evo session pause --config evo.yaml
 evo session resume --config evo.yaml
 ```
@@ -67,6 +69,22 @@ evo report --config evo.yaml
 evo compare --config evo.yaml --cycle 1
 evo gui --config evo.yaml --host 127.0.0.1 --port 8765
 ```
+
+The GUI can write the same file-backed controls as the CLI: comment with next
+hint, pause, resume, explicit promote, and rule proposal accept/reject. It must
+not be used to bypass evaluator gates.
+
+Rulebase review:
+
+```bash
+evo rules list --config evo.yaml
+evo rules propose --config evo.yaml
+evo rules accept <proposal-id> --config evo.yaml
+evo rules reject <proposal-id> "comment" --config evo.yaml
+```
+
+Accepted or informative rejected cycles create pending rule proposals
+automatically; they are inactive until accepted.
 
 Promotion is explicit:
 

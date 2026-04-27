@@ -169,6 +169,16 @@ evo session resume --config examples/abc/evo.yaml
 The daemon reloads `evo.yaml` between cycles, checks `.evo/session/state.json` before scheduling new work, and injects recent session comments through the normal memory path.
 It also writes `.evo/session/daemon.lock`, `.evo/session/active.json`, `.evo/session/active_run.json`, and heartbeat events so long runs are inspectable and a second daemon is refused.
 
+Use the human inbox as the compact steering surface for long runs:
+
+```bash
+evo session comment --config examples/abc/evo.yaml --next-hint "prefer parser-neutral fixes" "weighted input still fails"
+evo session inbox --config examples/abc/evo.yaml
+evo session clear-inbox --config examples/abc/evo.yaml
+```
+
+Inbox entries are summarized into `.evo/brief.md`, which is injected into future prompts when memory is enabled.
+
 Interrupted runs are detected before new work is scheduled. If a run has an active checkpoint but no final decision, plain `evo run` and `evo daemon` stop with an error instead of silently starting a new candidate. Inspect `.evo/runs/<run_id>/state.json`, then continue explicitly:
 
 ```bash
@@ -277,6 +287,7 @@ evo compare --config examples/abc/evo.yaml --cycle 1
 ```
 
 The report is written to `.evo/reports/compare-cycle-001.md` and recommends the highest numeric `evaluator_results.reward.score` when present. `reward.json` may also set `decision` to `accept`, `keep`, or `reject`; `keep` preserves a candidate without auto-promotion.
+For pooled runs, AutoEvoEDA also writes this comparison after all candidates in a cycle finish.
 
 Write long-running summary reports:
 
@@ -314,7 +325,9 @@ evo understand --config examples/abc/evo.yaml --phase profile
 evo understand --config examples/abc/evo.yaml --module src/map/ --changed-only
 ```
 
-`--phase scaffold` only writes mechanical manifests, raw file indexes, and `.evo/memory/code/understanding_targets.json`. It does not create fake profile, relationship, guidance, role-memory, or review documents. Other phases are Codex-owned and must directly create or update those Markdown/JSON files. In multi-repo mode, module paths such as `mapper/src/` are resolved against the child repo in `workspace.source_root`, not the adapter repo. The harness verifies that target memory files changed and that source repos stayed clean.
+`--phase scaffold` only writes mechanical manifests, raw file indexes, `.evo/memory/code/coverage.json`, and `.evo/memory/code/understanding_targets.json`. It does not create fake profile, relationship, guidance, role-memory, or review documents. Other phases are Codex-owned and must directly create or update those Markdown/JSON files. In multi-repo mode, module paths such as `mapper/src/` are resolved against the child repo in `workspace.source_root`, not the adapter repo. The harness verifies that target memory files changed and that source repos stayed clean.
+
+Prompt injection stays compact by default: `.evo/brief.md`, `.evo/memory/code/index.md`, and `.evo/memory/code/coverage.json` are injected, while detailed profile/guidance files are listed by path for targeted agent reads.
 
 ## Local GUI
 
@@ -324,7 +337,7 @@ Serve a local dashboard over `.evo` artifacts:
 evo gui --config examples/abc/evo.yaml --host 127.0.0.1 --port 8765
 ```
 
-The GUI displays workflow state, history, events, run documents, shared brief, roadmap, and code-memory index. It can also add session comments, pause/resume the daemon, and explicitly promote accepted candidates through the same file-backed APIs as the CLI.
+The GUI displays workflow state, history, events, run documents, shared brief, roadmap, code-memory index, human inbox, and pending rule proposals. It can also add session comments with next hints, pause/resume the daemon, review rule proposals, and explicitly promote accepted candidates through the same file-backed APIs as the CLI.
 
 ## Agent Session Registry
 
@@ -372,11 +385,11 @@ agents:
       session_file: .evo/agents/coder-main/codex_session.txt
 ```
 
-When `session_file` contains a session id, the harness runs `codex exec resume`; otherwise it starts a new Codex invocation. Resume failures are recorded and fail that agent call.
+When `session_file` contains a session id, the harness first runs `codex exec resume`; otherwise it starts a new Codex invocation. Resume failures are recorded as `resume_failed_new` and the framework starts a fresh invocation so long-running correctness depends on file-backed memory, not native Codex session continuity.
 
 ## Rulebase Loop
 
-Long-running runs can propose durable prompt rules from recent evidence, but rulebase changes require explicit human approval:
+Long-running runs propose durable prompt rules from accepted candidates and informative rejects. Rulebase changes still require explicit human approval:
 
 ```bash
 evo rules propose --config examples/abc/evo.yaml

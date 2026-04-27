@@ -13,6 +13,7 @@ from autoevoeda.artifacts import (
     append_history,
     clear_active_run,
     collect_evaluator_results,
+    compare_cycle,
     read_agent_memory,
     read_history,
     run_dir,
@@ -25,6 +26,7 @@ from autoevoeda.artifacts import (
     write_project_indexes,
     write_propose_doc,
     write_run_state,
+    maybe_propose_rule_update,
     run_cmd,
     set_session_status,
     write_agent_exchange,
@@ -108,6 +110,8 @@ def _record_decision(
     }
     append_history(repo, record)
     append_lesson(repo, cfg, record)
+    if cfg.memory.enabled:
+        maybe_propose_rule_update(repo, record)
     write_decision_doc(repo, run_id_value, record)
     _event(repo, run_id_value, "decision_recorded", candidate, {"decision": decision, "reason": reason})
     write_run_state(repo, run_id_value, "decision_recorded", candidate.cycle, candidate.index, candidate.branch, str(candidate.path))
@@ -577,4 +581,6 @@ def run_cycles(config_path: Path, cycles: int, human_review: bool = False, conti
             if cfg.human.stop_after_consecutive_rejects > 0 and consecutive_rejects >= cfg.human.stop_after_consecutive_rejects:
                 write_project_indexes(repo)
                 return
+        if pool_size > 1:
+            compare_cycle(config_path, cycle)
     write_project_indexes(repo)

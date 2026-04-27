@@ -106,6 +106,14 @@ def _all_files(config_path: Path, cfg: EvoConfig, repo: Path, modules: list[str]
     return {module: _module_files(config_path, cfg, repo, module, changed_only) for module in modules}
 
 
+def _module_commit(config_path: Path, cfg: EvoConfig, repo: Path, module: str) -> str:
+    if cfg.workspace.mode != "multi_repo":
+        return git(["rev-parse", "HEAD"], cwd=repo)
+    repo_cfg = _repo_for_prefix(cfg, module)
+    source = _source_root(config_path, cfg) / repo_cfg.path if repo_cfg else _source_root(config_path, cfg)
+    return git(["rev-parse", "HEAD"], cwd=source) if _is_git_repo(source) else ""
+
+
 def _source_status(config_path: Path, cfg: EvoConfig, repo: Path) -> dict[str, str]:
     if cfg.workspace.mode != "multi_repo":
         return {"root": git(["status", "--porcelain", "--", ":!.evo"], cwd=repo)}
@@ -135,10 +143,22 @@ def _target_docs(repo: Path, cfg: EvoConfig, phase: str) -> list[Path]:
     return targets.get(phase) or default_targets[phase]
 
 
-def _write_scaffold(repo: Path, cfg: EvoConfig, files: dict[str, list[str]]) -> None:
+def _write_scaffold(config_path: Path, repo: Path, cfg: EvoConfig, files: dict[str, list[str]]) -> None:
     memory = _memory_dir(repo)
     _write(memory / "manifest.json", json.dumps({"project": cfg.project.name, "modules": {k: len(v) for k, v in files.items()}, "generated_at": datetime.now(timezone.utc).isoformat()}, indent=2, sort_keys=True))
     _write(memory / "index.md", "\n".join(["# Code Understanding Index", "", "## Raw Index", *[f"- `{module}` -> `raw_index/{_safe_name(module)}.md` ({len(rows)} files)" for module, rows in files.items()], "", "## Agent-Owned Outputs", "- `profile/` and `modules/`", "- `relationships/`", "- `.evo/memory/guidance/`", "- role memories under `.evo/agents/`", "- `review/`"]))
+    coverage = {
+        module: {
+            "files": len(rows),
+            "sample_files": rows[:20],
+            "last_reviewed_commit": _module_commit(config_path, cfg, repo, module),
+            "confidence": "raw-index-only",
+            "stale_reason": "agent profile not reviewed",
+            "token_budget": min(6000, max(600, len(rows) * 80)),
+        }
+        for module, rows in files.items()
+    }
+    _write(memory / "coverage.json", json.dumps(coverage, indent=2, sort_keys=True))
     for module, rows in files.items():
         _write(memory / "raw_index" / f"{_safe_name(module)}.md", "\n".join([f"# Raw Index: {module}", "", f"Files: {len(rows)}", "", *[f"- `{row}`" for row in rows]]))
     targets = {phase: [str(path.relative_to(repo)) for path in _target_docs(repo, cfg, phase)] for phase in PHASES[1:]}
@@ -250,7 +270,7 @@ def run_understand(config_path: Path, phase: str = "all", modules: list[str] | N
         raise ValueError("unknown understanding phase: " + ", ".join(unknown))
     module_files = _all_files(config_path, cfg, repo, modules or _default_modules(config_path, cfg, repo), changed_only)
     if "scaffold" in selected:
-        _write_scaffold(repo, cfg, module_files)
+        _write_scaffold(config_path, repo, cfg, module_files)
         append_event(repo, "understand", "understanding_scaffold_written", 0, 0, "", {"modules": len(module_files)})
     for item in selected:
         if item != "scaffold":

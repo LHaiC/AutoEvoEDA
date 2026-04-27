@@ -102,6 +102,8 @@ Optional long-running loop:
 evo daemon --config examples/abc/evo.yaml --max-cycles 10 --sleep-s 30
 evo daemon --config examples/abc/evo.yaml --non-stop --sleep-s 60
 evo session comment --config examples/abc/evo.yaml "focus on one small safe improvement"
+evo session comment --config examples/abc/evo.yaml --next-hint "avoid parser changes" "focus on weighted input propagation"
+evo session inbox --config examples/abc/evo.yaml
 evo session pause --config examples/abc/evo.yaml
 evo session resume --config examples/abc/evo.yaml
 ```
@@ -113,5 +115,10 @@ Optional GUI:
 ```bash
 evo gui --config examples/abc/evo.yaml --host 127.0.0.1 --port 8765
 ```
+
+The GUI and CLI share the same file-backed controls for comments, pause/resume,
+explicit promotion, and rule proposal review. Rule proposals are generated from
+cycle evidence and require explicit human approval before entering the active
+rulebase.
 
 Important: `examples/abc/` uses placeholder adapter scripts. `examples/ghypart/` is a public submodule-backed weighted-hypergraph adapter with CUDA build/regression/perf gates for the first target. A real project must provide its own build, regression/CEC, QoR/performance, comparison, and reward scripts.

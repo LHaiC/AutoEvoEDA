@@ -154,10 +154,18 @@ def write_brief(repo: Path) -> None:
     history = read_history(repo)[-8:]
     interactions = _read_jsonl(repo / ".evo" / "agents" / "interactions.jsonl", 12)
     lessons = _read_jsonl(repo / ".evo" / "memory" / "lessons.jsonl", 8)
+    inbox = _read_jsonl(_inbox_path(repo), 8)
+    rules = list_rule_proposals_from_repo(repo)[-5:]
     lines = ["# AutoEvoEDA Brief", "", "## Recent Cycle Digest"]
     lines.extend(_cycle_digest(r) for r in history)
     lines.extend(["", "## Recent Agent Interactions"])
     lines.extend(f"- `{r.get('phase')}` by `{r.get('agent_id')}` ok={r.get('ok')}: {r.get('summary')}" for r in interactions)
+    if inbox:
+        lines.extend(["", "## Human Inbox"])
+        lines.extend(f"- {r.get('time')}: {r.get('type')} - {r.get('text') or r.get('comment')} {r.get('next_hint', '')}".rstrip() for r in inbox)
+    if rules:
+        lines.extend(["", "## Pending Rule Proposals"])
+        lines.extend(f"- `{item}`" for item in rules)
     if lessons:
         lines.extend(["", "## Compressed Lessons"])
         lines.extend(f"- {r.get('phase', r.get('run_id', 'cycle'))}: {r.get('lesson') or r.get('takeaway')}" for r in lessons if r.get("lesson") or r.get("takeaway"))
@@ -245,12 +253,13 @@ def set_session_status(config_path: Path, status: str) -> dict[str, Any]:
     return state
 
 
-def add_session_comment(config_path: Path, text: str) -> dict[str, Any]:
+def add_session_comment(config_path: Path, text: str, next_hint: str = "") -> dict[str, Any]:
     repo = project_repo(config_path)
     ensure_session(repo)
-    entry = {"time": _now(), "type": "human_comment", "text": text}
+    entry = {"time": _now(), "type": "human_comment", "text": text, "next_hint": next_hint, "read": False}
     _append_jsonl(_inbox_path(repo), entry)
-    append_event(repo, "session", "human_comment", 0, 0, "", {"text": text})
+    append_event(repo, "session", "human_comment", 0, 0, "", {"text": text, "next_hint": next_hint})
+    write_brief(repo)
     return entry
 
 
@@ -258,6 +267,22 @@ def recent_inbox(repo: Path, count: int = 5) -> list[dict[str, Any]]:
     path = _inbox_path(repo)
     lines = path.read_text().splitlines()[-count:] if path.exists() and count > 0 else []
     return [json.loads(line) for line in lines if line.strip()]
+
+
+def session_inbox(config_path: Path) -> list[dict[str, Any]]:
+    return _read_jsonl(_inbox_path(project_repo(config_path)), 200)
+
+
+def clear_session_inbox(config_path: Path) -> dict[str, Any]:
+    repo = project_repo(config_path)
+    path = _inbox_path(repo)
+    rows = _read_jsonl(path, 100000)
+    cleared_at = _now()
+    if rows:
+        path.write_text("".join(json.dumps({**row, "read": True, "read_at": cleared_at}, ensure_ascii=False, sort_keys=True) + "\n" for row in rows))
+    append_event(repo, "session", "human_inbox_read", 0, 0, "", {"count": len(rows)})
+    write_brief(repo)
+    return {"count": len(rows), "read_at": cleared_at}
 
 
 def assert_not_paused(config_path: Path) -> None:
@@ -501,14 +526,15 @@ def _proposal_dir(repo: Path) -> Path:
 
 
 def list_rule_proposals(config_path: Path) -> list[str]:
-    return [path.stem for path in sorted(_proposal_dir(project_repo(config_path)).glob("*.md"))]
+    return list_rule_proposals_from_repo(project_repo(config_path))
 
 
-def propose_rules(config_path: Path) -> Path:
-    repo = project_repo(config_path)
-    proposal_id = datetime.now(timezone.utc).strftime("rule-%Y%m%d-%H%M%S")
+def list_rule_proposals_from_repo(repo: Path) -> list[str]:
+    return [path.stem for path in sorted(_proposal_dir(repo).glob("*.md"))]
+
+
+def write_rule_proposal(repo: Path, proposal_id: str, history: list[dict[str, Any]], trigger: dict[str, Any] | None = None) -> Path:
     path = _proposal_dir(repo) / f"{proposal_id}.md"
-    history = read_history(repo)[-20:]
     repeated = sorted({r.get("reason") for r in history if sum(1 for x in history if x.get("reason") == r.get("reason")) >= 2 and r.get("reason")})
     lines = [
         f"# Rule Proposal: {proposal_id}",
@@ -523,14 +549,34 @@ def propose_rules(config_path: Path) -> Path:
         "## Recent Evidence",
         "",
         *[f"- cycle {r.get('cycle')}: {r.get('decision')} / {r.get('reason')}" for r in history[-10:]],
-        "",
-        "## Human Decision",
-        "",
-        "Accept this proposal with `evo rules accept` or reject it with a comment.",
     ]
+    if trigger:
+        lines.extend(["", "## Trigger", "", f"- cycle {trigger.get('cycle')}: {trigger.get('decision')} / {trigger.get('reason')}"])
+    lines.extend(["", "## Human Decision", "", "Accept this proposal with `evo rules accept` or reject it with a comment."])
     path.write_text("\n".join(lines) + "\n")
     append_event(repo, "rules", "rule_proposed", 0, 0, "", {"proposal": proposal_id})
+    write_brief(repo)
     return path
+
+
+def propose_rules(config_path: Path) -> Path:
+    repo = project_repo(config_path)
+    proposal_id = datetime.now(timezone.utc).strftime("rule-%Y%m%d-%H%M%S-%f")
+    return write_rule_proposal(repo, proposal_id, read_history(repo)[-20:])
+
+
+def maybe_propose_rule_update(repo: Path, record: dict[str, Any]) -> Path | None:
+    decision = record.get("decision")
+    reason = str(record.get("reason", ""))
+    if decision not in {"accept", "keep", "reject"}:
+        return None
+    if decision == "reject" and reason in {"agent_failed", "planner_failed", "runner_preflight_failed"}:
+        return None
+    proposal_id = f"rule-cycle-{int(record.get('cycle', 0)):03d}-cand-{int(record.get('candidate_index', 1)):03d}"
+    path = _proposal_dir(repo) / f"{proposal_id}.md"
+    if path.exists():
+        return None
+    return write_rule_proposal(repo, proposal_id, read_history(repo)[-20:], record)
 
 
 def accept_rule(config_path: Path, proposal_id: str) -> Path:
@@ -550,16 +596,26 @@ def accept_rule(config_path: Path, proposal_id: str) -> Path:
     rulebase.parent.mkdir(parents=True, exist_ok=True)
     existing = rulebase.read_text() if rulebase.exists() else "# Rulebase\n"
     rulebase.write_text(existing.rstrip() + "\n\n" + text.rstrip() + "\n")
+    accepted = repo / ".evo" / "rules" / "accepted" / proposal.name
+    accepted.parent.mkdir(parents=True, exist_ok=True)
+    proposal.replace(accepted)
     append_event(repo, "rules", "rule_accepted", 0, 0, "", {"proposal": proposal_id})
+    write_brief(repo)
     return rulebase
 
 
 def reject_rule(config_path: Path, proposal_id: str, comment: str) -> Path:
     repo = project_repo(config_path)
     path = repo / ".evo" / "rules" / "rejections.jsonl"
+    proposal = _proposal_dir(repo) / f"{proposal_id}.md"
+    rejected = repo / ".evo" / "rules" / "rejected" / f"{proposal_id}.md"
+    if proposal.exists():
+        rejected.parent.mkdir(parents=True, exist_ok=True)
+        proposal.replace(rejected)
     record = {"time": _now(), "proposal": proposal_id, "comment": comment}
     _append_jsonl(path, record)
     append_event(repo, "rules", "rule_rejected", 0, 0, "", record)
+    write_brief(repo)
     return path
 
 

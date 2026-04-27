@@ -75,15 +75,18 @@ def render_prompt(base_prompt: str, repo: Path, cfg: EvoConfig) -> str:
         code_index = _read_if_present(repo / ".evo" / "memory" / "code" / "index.md")
         if code_index:
             sections.extend(["", "## Code understanding index", code_index])
-        for rel in [*cfg.understanding.profile_docs, *cfg.understanding.relationship_docs, *cfg.understanding.guidance_docs]:
-            content = _read_if_present(repo / rel)
-            if content:
-                sections.extend(["", f"## Understanding {rel}", content])
+        coverage = _read_if_present(repo / ".evo" / "memory" / "code" / "coverage.json")
+        if coverage:
+            sections.extend(["", "## Code understanding coverage", coverage])
+        detailed = [*cfg.understanding.profile_docs, *cfg.understanding.relationship_docs, *cfg.understanding.guidance_docs]
+        if detailed:
+            sections.extend(["", "## Detailed understanding files", *[f"- `{rel}`" for rel in detailed]])
 
         for title, agent_id in [
             ("Planner agent memory", cfg.agents.planner.session_id),
             ("Coder agent memory", cfg.agents.coder.session_id),
             ("Reviewer agent memory", cfg.agents.reviewer.session_id),
+            ("Rulebase agent memory", cfg.agents.rulebase.session_id),
         ]:
             agent_memory = read_agent_memory(repo, agent_id)
             if agent_memory:

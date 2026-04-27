@@ -27,7 +27,7 @@ class CodexBackend:
         self.config = config or {}
 
     def run(self, prompt: str, cwd: Path, timeout_s: int, session_id: str = "", env: dict[str, str] | None = None) -> AgentResult:
-        cmd = ["codex", "exec", *self._model_args(include_profile=True, include_add_dirs=True), "--full-auto", "--sandbox", self.sandbox, "--skip-git-repo-check", "-"]
+        cmd = self._fresh_cmd()
         mode = "new"
         if session_id:
             cmd = ["codex", "exec", "resume", *self._model_args(include_profile=False, include_add_dirs=False), "--full-auto", "--skip-git-repo-check", session_id, "-"]
@@ -42,7 +42,27 @@ class CodexBackend:
             timeout=timeout_s,
             env={**os.environ, **(env or {})},
         )
+        if session_id and proc.returncode != 0:
+            fresh = subprocess.run(
+                self._fresh_cmd(),
+                cwd=cwd,
+                input=prompt,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=timeout_s,
+                env={**os.environ, **(env or {})},
+            )
+            return AgentResult(
+                ok=fresh.returncode == 0,
+                stdout=fresh.stdout,
+                stderr=f"resume stderr:\n{proc.stderr}\n\nfresh stderr:\n{fresh.stderr}",
+                session_mode="resume_failed_new",
+            )
         return AgentResult(ok=proc.returncode == 0, stdout=proc.stdout, stderr=proc.stderr, session_mode=mode)
+
+    def _fresh_cmd(self) -> list[str]:
+        return ["codex", "exec", *self._model_args(include_profile=True, include_add_dirs=True), "--full-auto", "--sandbox", self.sandbox, "--skip-git-repo-check", "-"]
 
     def _model_args(self, include_profile: bool, include_add_dirs: bool) -> list[str]:
         args = []
