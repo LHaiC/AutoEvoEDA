@@ -1,41 +1,57 @@
-# gHyPart Adapter Example
+# gHyPart Weighted Adapter Example
 
-This example shows how to wire AutoEvoEDA to a real public CUDA EDA repository without putting project-specific logic in the framework.
+This adapter wires AutoEvoEDA to the public `gHyPart_TACO` CUDA hypergraph partitioner and makes the first real target weighted-hypergraph support.
 
-- Source submodule: `examples/gHyPart_TACO`
-- Adapter files: `examples/ghypart`
-- Candidate workspace: `examples/.evo-worktrees/<run>/ghypart`
+- Adapter workdir: `examples/ghypart`
+- Source submodule: `examples/ghypart/source/gHyPart_TACO`
+- Candidate workspace: `examples/ghypart/.evo-worktrees/<run>/ghypart`
 - Run state and history: `examples/ghypart/.evo/`
+- Adapter-owned benchmarks: `examples/ghypart/benchmarks/`
 
-The adapter uses `workspace.mode: multi_repo` even though it has one child repo. That keeps the adapter, logs, prompts, and evaluator scripts outside the candidate source tree.
+The adapter uses `workspace.mode: multi_repo` even though it has one child repo. That keeps prompts, scripts, benchmarks, logs, and `.evo/` outside the candidate source tree.
 
 ## Setup
 
 ```bash
-git submodule update --init --recursive examples/gHyPart_TACO
+git submodule update --init --recursive examples/ghypart/source/gHyPart_TACO
 pip install -e .
 evo config validate --config examples/ghypart/evo.yaml
 ```
 
-Build requirements follow the upstream project documentation in `examples/gHyPart_TACO/README.md`. If the local checkout contains `BUILD_REPRO_CPU_GPU.md`, use it as the reproduction note for this machine.
+Build requirements follow the upstream project documentation in `examples/ghypart/source/gHyPart_TACO/README.md`.
 
-## Smoke Run
+## Target
 
-The included scripts are intentionally conservative:
+Convert the current unweighted `.hgr` handling into real hMETIS-style weighted handling:
 
-- `build.sh` configures and builds `gHyPart` in the candidate worktree.
-- `run_regression.sh` runs the binary with no arguments and checks the startup usage text.
-- `compare_regression.py` checks the JSON produced by the smoke regression.
-- `run_perf.sh` records that no public benchmark metric is configured yet.
-- `reward.py` fails unless `AUTOEVO_ALLOW_PLACEHOLDER_REWARD=1` is set.
+- unweighted input still works
+- hyperedge weights are parsed when `fmt` enables them
+- vertex weights are parsed when `fmt` enables them
+- weighted cut/balance bookkeeping can use those weights
+- evaluator files and benchmark inputs stay immutable
 
-This means the adapter can validate harness plumbing and build/regression wiring, but it is not a real performance-evolution benchmark until a project-owned benchmark set, golden outputs, and reward metric are added.
+The regression uses two adapter-owned public smoke inputs:
 
-## Example Commands
+```text
+benchmarks/unweighted_smoke.hgr
+benchmarks/weighted_smoke.hgr
+```
+
+For weighted inputs, the candidate must print a machine-readable summary line whose totals match the input:
+
+```text
+AUTOEVO_WEIGHTED_HGR edge_weights=<0-or-1> vertex_weights=<0-or-1> total_edge_weight=<sum> total_vertex_weight=<sum> pins=<pin-count>
+```
+
+`run_regression.sh` computes the expected line from `weighted_smoke.hgr` and rejects candidates that do not emit it.
+
+## Commands
 
 ```bash
 evo understand --config examples/ghypart/evo.yaml --phase scaffold
-AUTOEVO_ALLOW_PLACEHOLDER_REWARD=1 evo run --config examples/ghypart/evo.yaml --cycles 1
+evo run --config examples/ghypart/evo.yaml --cycles 1
 ```
 
-Do not commit generated `examples/ghypart/.evo/`, candidate worktrees, build directories, datasets, or benchmark results.
+The evaluator is CUDA-only. `runner.preflight` checks NVIDIA device visibility before build/regression/perf gates. Candidate code agents remain scoped by guards; evaluator access is recorded with `runner.sandbox: danger-full-access`.
+
+Do not commit generated `.evo/`, `.evo-worktrees/`, source build directories, datasets, or benchmark results.

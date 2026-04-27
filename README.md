@@ -60,7 +60,7 @@ Validate the example adapter configs:
 ```bash
 evo config validate --config examples/abc/evo.yaml
 evo config validate --config examples/multi_repo/evo.yaml
-git submodule update --init --recursive examples/gHyPart_TACO
+git submodule update --init --recursive examples/ghypart/source/gHyPart_TACO
 evo config validate --config examples/ghypart/evo.yaml
 ```
 
@@ -112,4 +112,4 @@ Optional GUI:
 evo gui --config examples/abc/evo.yaml --host 127.0.0.1 --port 8765
 ```
 
-Important: `examples/abc/` uses placeholder adapter scripts. `examples/ghypart/` is a public submodule-backed build/regression smoke adapter, but still needs a real benchmark/reward metric before it should drive performance evolution. A real project must provide its own build, regression/CEC, QoR/performance, comparison, and reward scripts.
+Important: `examples/abc/` uses placeholder adapter scripts. `examples/ghypart/` is a public submodule-backed weighted-hypergraph adapter with CUDA build/regression/perf gates for the first target. A real project must provide its own build, regression/CEC, QoR/performance, comparison, and reward scripts.

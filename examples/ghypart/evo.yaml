@@ -7,10 +7,14 @@ project:
 agent:
   prompt_file: prompts/coder.md
 
+runner:
+  sandbox: danger-full-access
+  preflight: bash "$AUTOEVO_ADAPTER_ROOT/scripts/cuda_preflight.sh"
+
 workspace:
   mode: multi_repo
-  source_root: ..
-  worktree_root: ../.evo-worktrees
+  source_root: source
+  worktree_root: .evo-worktrees
   repos:
     - name: ghypart
       path: gHyPart_TACO
@@ -22,6 +26,7 @@ workspace:
         - use_uvm_impl/
         - utility/
         - CMakeLists.txt
+        - main.cu
       forbidden_paths:
         - benchmark_set/
         - build/
@@ -42,15 +47,23 @@ guards:
     - ghypart/use_uvm_impl/
     - ghypart/utility/
     - ghypart/CMakeLists.txt
+    - ghypart/main.cu
   forbidden_paths:
     - scripts/
     - results/
     - golden/
+    - benchmarks/
     - ghypart/benchmark_set/
     - ghypart/build/
     - ghypart/results/
+    - ghypart/benchmarks/
     - ghypart/scripts/
     - ghypart/cpu_works/
+
+result_files:
+  correctness: results/correctness.json
+  perf: results/perf.json
+  reward: results/reward.json
 
 pipeline:
   build: bash "$AUTOEVO_ADAPTER_ROOT/scripts/build.sh"

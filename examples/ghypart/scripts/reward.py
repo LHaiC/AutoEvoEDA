@@ -4,8 +4,10 @@ import json
 import os
 from pathlib import Path
 
-root = Path(os.environ["AUTOEVO_CANDIDATE_ROOT"])
-allow_placeholder = os.environ.get("AUTOEVO_ALLOW_PLACEHOLDER_REWARD") == "1"
-(root / "results" / "reward.json").write_text(json.dumps({"accepted": allow_placeholder, "placeholder": True}, indent=2) + "\n")
-if not allow_placeholder:
-    raise SystemExit("placeholder reward disabled; configure a real benchmark metric")
+results = Path(os.environ["AUTOEVO_CANDIDATE_ROOT"]) / "results"
+correctness = json.loads((results / "correctness.json").read_text())
+perf = json.loads((results / "perf.json").read_text())
+accepted = correctness["weighted_summary"] and perf["weighted_total_s"] > 0
+(results / "reward.json").write_text(json.dumps({"accepted": accepted, "score": 1.0 / perf["weighted_total_s"]}, indent=2, sort_keys=True) + "\n")
+if not accepted:
+    raise SystemExit("weighted support reward rejected")
