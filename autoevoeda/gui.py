@@ -36,6 +36,7 @@ def render_dashboard(repo: Path) -> str:
     state = _read(evo / "session" / "state.json")
     events = _read_jsonl(evo / "events.jsonl")[-30:]
     history = _read_jsonl(evo / "history.jsonl")[-30:]
+    brief = _read(evo / "brief.md")
     roadmap = _read(evo / "roadmap.md")
     memory_index = _read(evo / "memory" / "code" / "index.md")
     runs_dir = evo / "runs"
@@ -96,6 +97,7 @@ a {{ color: #0f5f8f; }}
 <section><h2>History</h2><table><tr><th>Cycle</th><th>Candidate</th><th>Decision</th><th>Reason</th><th>Branch</th></tr>{rows}</table></section>
 <section><h2>Recent Events</h2><table><tr><th>Time</th><th>Type</th><th>Run</th><th>Payload</th></tr>{event_rows}</table></section>
 <section><h2>Runs</h2><ul>{run_links}</ul></section>
+<section><h2>Shared Brief</h2><pre>{escape(brief)}</pre></section>
 <section><h2>Roadmap</h2><pre>{escape(roadmap)}</pre></section>
 <section><h2>Code Memory Index</h2><pre>{escape(memory_index)}</pre></section>
 </body>

@@ -14,6 +14,8 @@ argument-hint: "<project-repo> [goal-or-domain-agents]"
 
 You are creating or updating an AutoEvoEDA adapter for: **$ARGUMENTS**.
 
+AutoEvoEDA is alpha. Present it as a framework-level harness reproduction, not as a completed reproduction of the paper's ABC experiments or QoR results.
+
 ## 1. Inspect the project
 
 If the task edits the AutoEvoEDA framework itself, read `references/project-internals.md` first.
@@ -53,7 +55,9 @@ Read `references/evo-yaml.md`. For sibling-repo workspaces, also read `reference
 
 ## 4. Explain commands and state
 
-Read `references/commands.md` before explaining how to run, continue, non-stop daemon mode, pause, resume, inspect `.evo/`, or promote candidates.
+Read `references/commands.md` before explaining how to run, continue, non-stop daemon mode, pause, resume, inspect `.evo/`, read `.evo/brief.md`, follow `.evo/agents/interactions.jsonl`, or promote candidates.
+
+For long local runs, copy or adapt `scripts/evo_nonstop_supervisor.sh` into the adapter's `scripts/` directory.
 
 ## 5. Framework edits
 

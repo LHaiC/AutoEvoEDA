@@ -50,7 +50,7 @@ Empty values use the user's Codex defaults. `agent.config` maps to `codex exec -
 
 ## Paper Fidelity Status
 
-`AutoEvoEDA` implements the reusable outer loop from arXiv:2604.15082v1: Codex invocation, candidate worktrees, patch guards, event logs, run directories, phase documents, human comments, memory injection, local GUI inspection/control, rule proposals, and explicit promotion.
+`AutoEvoEDA` is an alpha framework-level reproduction of the reusable outer loop from arXiv:2604.15082v1: Codex invocation, candidate worktrees, patch guards, event logs, run directories, phase documents, human comments, memory injection, local GUI inspection/control, rule proposals, and explicit promotion.
 
 It does not yet reproduce the full paper system. The paper is an ABC-specific multi-agent self-evolution system with cycle-0 knowledge bootstrapping, a global planning agent, three domain-specialized coding agents, formal equivalence checking, large-scale QoR evaluation, and a self-evolving rulebase. This repository is currently the framework shell that an ABC adapter can use to build toward that system.
 
@@ -90,7 +90,7 @@ rulebase:
   Proposals are file-backed, safety-checked, and require explicit human approval.
 
 code_understanding:
-  Optional. Runs through evo understand --agent to enrich deterministic code memory.
+  Owns non-scaffold evo understand phases and writes durable pre-evolution memory.
 ```
 
 This differs from the paper. The paper uses a global planning agent plus three ABC domain coding agents: Flow Agent, Mapper Agent, and Logic Minimization Agent. Those agents operate on distinct ABC subsystems and are coordinated through a shared evolving rulebase and a unified correctness/QoR pipeline. `AutoEvoEDA` now supports configurable domain-agent identities, but it does not ship ABC-specific Flow/Mapper/Logic prompts, scopes, or adapter scripts.
@@ -147,7 +147,7 @@ runner:
 
 ## Long-Running Controls
 
-Enable memory in `evo.yaml` to inject project memory, recent lessons, rejected ideas, accepted patterns, and patch scope into the Codex prompt. Lessons are appended to `.evo/memory/lessons.jsonl` after each cycle.
+Enable memory in `evo.yaml` to inject project memory, recent lessons, rejected ideas, accepted patterns, the shared brief, and patch scope into the Codex prompt. Each agent call is instructed to end with `handoff_summary:` and `lesson_learned:`; the harness records those handoffs in `.evo/agents/interactions.jsonl`, `.evo/memory/lessons.jsonl`, and the concise `.evo/brief.md`. Cycle decisions also append a compact decision lesson.
 
 Use human review when accepted candidates should pause for manual steering:
 
@@ -305,15 +305,16 @@ The repository-level event log is `.evo/events.jsonl`. Human review decisions ca
 
 ## Code Understanding Memory
 
-Seed hierarchical code memory before long-running evolution:
+Run the pre-evolution understanding workflow before long-running evolution:
 
 ```bash
 evo understand --config examples/abc/evo.yaml
-evo understand --config examples/abc/evo.yaml --agent
+evo understand --config examples/abc/evo.yaml --phase scaffold
+evo understand --config examples/abc/evo.yaml --phase profile
 evo understand --config examples/abc/evo.yaml --module src/map/ --changed-only
 ```
 
-This writes deterministic memory under `.evo/memory/code/`, including module summaries, invariants, workflow notes, and cycle-0 bootstrap docs under `.evo/memory/code/bootstrap/`. In multi-repo mode, module paths such as `mapper/src/` are resolved against the child repo in `workspace.source_root`, not the adapter repo. Use `--agent` to ask Codex to enrich `.evo/memory/code/agent_notes.md` while preserving deterministic memory as the baseline.
+`--phase scaffold` only writes mechanical manifests, raw file indexes, and `.evo/memory/code/understanding_targets.json`. It does not create fake profile, relationship, guidance, role-memory, or review documents. Other phases are Codex-owned and must directly create or update those Markdown/JSON files. In multi-repo mode, module paths such as `mapper/src/` are resolved against the child repo in `workspace.source_root`, not the adapter repo. The harness verifies that target memory files changed and that source repos stayed clean.
 
 ## Local GUI
 
@@ -323,7 +324,7 @@ Serve a local dashboard over `.evo` artifacts:
 evo gui --config examples/abc/evo.yaml --host 127.0.0.1 --port 8765
 ```
 
-The GUI displays workflow state, history, events, run documents, roadmap, and code-memory index. It can also add session comments, pause/resume the daemon, and explicitly promote accepted candidates through the same file-backed APIs as the CLI.
+The GUI displays workflow state, history, events, run documents, shared brief, roadmap, and code-memory index. It can also add session comments, pause/resume the daemon, and explicitly promote accepted candidates through the same file-backed APIs as the CLI.
 
 ## Agent Session Registry
 
@@ -334,7 +335,15 @@ The GUI displays workflow state, history, events, run documents, roadmap, and co
 .evo/agents/<agent_id>/transcript.jsonl
 .evo/agents/<agent_id>/last_prompt.md
 .evo/agents/<agent_id>/last_response.md
+.evo/agents/<agent_id>/exchanges/*.prompt.md
+.evo/agents/<agent_id>/exchanges/*.response.md
+.evo/agents/interactions.jsonl
+.evo/memory/lessons.jsonl
+.evo/brief.md
+.evo/runs/<run_id>/agent_flow.md
 ```
+
+Future prompts list these paths and inject `.evo/brief.md`, so planner, coder, reviewer, repair, and understanding roles can explicitly read previous decisions, lessons, plans, and agent-to-agent exchanges without bloating every prompt. `.evo/roadmap.md` is agent-owned mutable planning state; use `.evo/brief.md` for the concise shared historical query surface.
 
 Configure stable role ids in `evo.yaml`:
 

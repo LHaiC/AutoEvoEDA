@@ -28,6 +28,7 @@ from autoevoeda.artifacts import (
     run_cmd,
     set_session_status,
     write_agent_exchange,
+    handoff_error,
     assert_not_paused,
     ensure_session,
 )
@@ -176,6 +177,10 @@ def _role_prompt(repo: Path, cfg: EvoConfig, path: str) -> str:
     return render_prompt((repo / path).read_text(), repo, cfg) if path else ""
 
 
+def _handoff_instruction(prompt: str) -> str:
+    return prompt.rstrip() + "\n\n# Required handoff\nEnd your final response with two single-line fields:\nhandoff_summary: <one concise sentence about what you did or decided>\nlesson_learned: <one concise reusable lesson, or \"none\">\n"
+
+
 def _run_agent(
     repo: Path,
     run_id_value: str,
@@ -188,11 +193,15 @@ def _run_agent(
     prompt: str,
     event_payload: dict[str, object] | None = None,
 ) -> AgentResult:
+    prompt = _handoff_instruction(prompt)
     result = run_codex_role(repo, role, agent, prompt, candidate.path, cfg.agent.timeout_s)
+    error = handoff_error(result.ok, result.stdout)
+    if error:
+        result = AgentResult(False, result.stdout, error, result.session_mode)
     _checkpoint(repo, run_id_value, f"{phase}_finished", candidate)
     _write_text(cycle_dir / f"{phase}.stdout", result.stdout)
     _write_text(cycle_dir / f"{phase}.stderr", result.stderr)
-    write_agent_exchange(repo, role.session_id, prompt, result.stdout, result.stderr, result.ok)
+    write_agent_exchange(repo, role.session_id, prompt, result.stdout, result.stderr, result.ok, run_id_value, phase, cfg.memory.lessons if cfg.memory.enabled else "")
     payload = {"ok": result.ok, **(event_payload or {})}
     _event(repo, run_id_value, f"{phase}_finished", candidate, payload)
     return result

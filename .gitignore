@@ -1,3 +1,5 @@
 docs/
 __pycache__/
 *.py[cod]
+*.egg-info/
+.evo/

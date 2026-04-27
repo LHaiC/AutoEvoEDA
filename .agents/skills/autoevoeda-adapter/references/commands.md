@@ -12,21 +12,30 @@ Validate an adapter config:
 evo config validate --config evo.yaml
 ```
 
-Seed deterministic code-understanding memory:
+Run pre-evolution understanding:
 
 ```bash
 evo understand --config evo.yaml
-evo understand --config evo.yaml --agent
+evo understand --config evo.yaml --phase scaffold
+evo understand --config evo.yaml --phase profile
 evo understand --config evo.yaml --module src/map/ --changed-only
 ```
 
-For `workspace.mode: multi_repo`, `evo understand` scans child repos from `workspace.source_root/<repo.path>` and scans configured non-repo assets from `workspace.materialize` or non-repo `guards.allowed_paths`.
+`--phase scaffold` only writes manifests, raw file indexes, and `.evo/memory/code/understanding_targets.json`. It must not create fake profile, guidance, relationship, role-memory, or review documents. Those files are Codex-owned and must be created or edited by the non-scaffold phases. For `workspace.mode: multi_repo`, `evo understand` scans child repos from `workspace.source_root/<repo.path>` and scans configured non-repo assets from `workspace.materialize` or non-repo `guards.allowed_paths`.
 
 Run local evolution:
 
 ```bash
 evo run --config evo.yaml --cycles 1
 evo run --config evo.yaml --cycles 5 --human-review
+```
+
+After each agent call, inspect concise shared context with:
+
+```bash
+cat .evo/brief.md
+tail -n 20 .evo/memory/lessons.jsonl
+tail -n 20 .evo/agents/interactions.jsonl
 ```
 
 Run a file-controlled long loop:
@@ -39,6 +48,15 @@ evo session comment --config evo.yaml "steering note"
 evo session pause --config evo.yaml
 evo session resume --config evo.yaml
 ```
+
+For tmux/system supervision, copy the bundled script and edit only adapter-local paths if needed:
+
+```bash
+cp .agents/skills/autoevoeda-adapter/scripts/evo_nonstop_supervisor.sh scripts/
+AUTOEVO_ADAPTER_ROOT="$PWD" AUTOEVO_PROJECT_ROOT="$PWD" scripts/evo_nonstop_supervisor.sh
+```
+
+Set `AUTOEVO_REQUIRE_CUDA=1` when the adapter has a hard CUDA preflight script. Set `AUTOEVO_UNDERSTAND_PHASES="scaffold profile"` for a short bootstrap, or leave it unset for the full alpha understanding sequence.
 
 Inspect and report:
 

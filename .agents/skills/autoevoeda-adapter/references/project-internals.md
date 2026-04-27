@@ -10,7 +10,7 @@ Read this before editing the AutoEvoEDA framework code. Keep framework changes s
 - `autoevoeda/artifacts.py`: `.evo/` artifact APIs. Owns run directories, events, history, phase docs, reports, session state, active-run marker, agent registry, rule proposals, promotion, compare, and worktree cleanup helpers.
 - `autoevoeda/agents/codex.py`: Codex CLI subprocess backend and optional native resume call path.
 - `autoevoeda/memory.py`: prompt assembly and durable lesson injection.
-- `autoevoeda/understand.py`: deterministic code-understanding memory and optional understanding-agent enrichment. In multi-repo mode, it scans `workspace.source_root` child repos and configured non-repo asset directories, not the adapter repo.
+- `autoevoeda/understand.py`: pre-evolution understanding workflow. Scaffold writes only raw indexes and target manifests; profile, relationships, guidance, role-memory, and review phases are agent-owned and verify target memory edits plus clean source repos.
 - `autoevoeda/daemon.py`: long-running loop, daemon lock, heartbeat, pause/resume checks, and consecutive-reject stop.
 - `autoevoeda/human.py`: terminal human checkpoint prompts.
 - `autoevoeda/gui.py`: local read/control dashboard over `.evo` files.
@@ -40,12 +40,15 @@ Promotion is separate: `evo promote` fast-forwards the configured champion branc
 ## `.evo/` State Model
 
 - `.evo/runs/<run_id>/`: `00_context.md`, `01_propose.md`, `02_implement.md`, `03_benchmark.md`, `04_decision.md`, command stdout/stderr, `patch.diff`, `events.jsonl`, `evaluator_results.json`, `state.json`, `reproducibility.json`.
+- `.evo/brief.md`: concise shared history rebuilt from recent decisions and agent handoffs.
 - `.evo/events.jsonl`: global event stream.
 - `.evo/history.jsonl`: final candidate decisions and promotion records.
 - `.evo/session/state.json`: `running` or `paused`.
 - `.evo/session/active_run.json`: interrupt-safe active checkpoint; new work must refuse to start until abandoned or cleared.
-- `.evo/agents/<session_id>/`: role memory, transcript, last prompt, last response, optional Codex session events.
-- `.evo/memory/`: project memory, lessons, rejected ideas, accepted patterns, rulebase, and code-understanding docs.
+- `.evo/agents/<session_id>/`: role memory, transcript, last prompt, last response, per-call exchange files, optional Codex session events.
+- `.evo/agents/interactions.jsonl`: explicit cross-agent exchange log summarized by `.evo/brief.md`.
+- `.evo/runs/<run_id>/agent_flow.md`: per-run chain of planner/coder/reviewer/repair calls.
+- `.evo/memory/`: project memory, lessons, agent handoffs, rejected ideas, accepted patterns, rulebase, and code-understanding docs.
 
 ## Config Ownership
 
@@ -66,7 +69,7 @@ If `domain_agents` is non-empty, config validation requires `multi_agent.planner
 - `domain_agents`: optional specialist coders with their own prompt, session id, allowed paths, forbidden paths, and proposal requirements.
 - `reviewer`: optional advisory pass after guard and before gates; never replaces evaluator scripts.
 - `repair`: optional bounded pass after failed gates.
-- `code_understanding`: optional role used by `evo understand --agent`.
+- `code_understanding`: role used by non-scaffold `evo understand` phases to write durable pre-evolution memory.
 
 Domain-agent Codex output must include `hypothesis:`, `target_files:`, `expected_metric_impact:`, and `rollback_risk:` so `cycle.py` can write `agent_proposal.json` and `agent_proposal.md`.
 

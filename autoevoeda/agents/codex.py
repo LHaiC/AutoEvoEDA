@@ -26,14 +26,15 @@ class CodexBackend:
         self.config = config or {}
 
     def run(self, prompt: str, cwd: Path, timeout_s: int, session_id: str = "") -> AgentResult:
-        cmd = ["codex", "exec", *self._model_args(include_profile=True), "--full-auto", "--sandbox", self.sandbox, "--skip-git-repo-check", prompt]
+        cmd = ["codex", "exec", *self._model_args(include_profile=True, include_add_dirs=True), "--full-auto", "--sandbox", self.sandbox, "--skip-git-repo-check", "-"]
         mode = "new"
         if session_id:
-            cmd = ["codex", "exec", "resume", *self._model_args(include_profile=False), "--full-auto", "--skip-git-repo-check", session_id, prompt]
+            cmd = ["codex", "exec", "resume", *self._model_args(include_profile=False, include_add_dirs=False), "--full-auto", "--skip-git-repo-check", session_id, "-"]
             mode = "resume"
         proc = subprocess.run(
             cmd,
             cwd=cwd,
+            input=prompt,
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -41,13 +42,18 @@ class CodexBackend:
         )
         return AgentResult(ok=proc.returncode == 0, stdout=proc.stdout, stderr=proc.stderr, session_mode=mode)
 
-    def _model_args(self, include_profile: bool) -> list[str]:
+    def _model_args(self, include_profile: bool, include_add_dirs: bool) -> list[str]:
         args = []
         if self.model:
             args.extend(["--model", self.model])
         if include_profile and self.profile:
             args.extend(["--profile", self.profile])
+        if include_add_dirs:
+            for value in self.config.get("add_dirs", []):
+                args.extend(["--add-dir", str(value)])
         for key, value in self.config.items():
+            if key == "add_dirs":
+                continue
             args.extend(["--config", f"{key}={_toml_value(value)}"])
         return args
 

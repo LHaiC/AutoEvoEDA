@@ -66,9 +66,9 @@ def build_parser() -> argparse.ArgumentParser:
     session.add_argument("action", choices=["status", "comment", "pause", "resume"])
     session.add_argument("text", nargs="*")
     session.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
-    understand = subparsers.add_parser("understand", help="write deterministic code-understanding memory")
+    understand = subparsers.add_parser("understand", help="run pre-evolution understanding workflow")
     understand.add_argument("--config", "-c", type=Path, default=Path("evo.yaml"))
-    understand.add_argument("--agent", action="store_true", help="enrich deterministic memory with Codex")
+    understand.add_argument("--phase", choices=["scaffold", "profile", "relationships", "guidance", "role_memory", "review", "all"], default="all")
     understand.add_argument("--module", action="append", dest="modules", help="limit understanding to one allowed prefix")
     understand.add_argument("--changed-only", action="store_true", help="index changed files under selected modules")
     gui = subparsers.add_parser("gui", help="serve a local dashboard")
@@ -138,7 +138,7 @@ def main() -> None:
         if args.action == "resume":
             print(set_session_status(args.config, "running"))
     elif args.command == "understand":
-        run_understand(args.config, use_agent=args.agent, modules=args.modules, changed_only=args.changed_only)
+        run_understand(args.config, phase=args.phase, modules=args.modules, changed_only=args.changed_only)
     elif args.command == "gui":
         serve_gui(args.config, args.host, args.port)
 

@@ -92,6 +92,29 @@ budget:
 promotion:
   require_clean_champion: true
 
+understanding:
+  phases: [scaffold, profile, relationships, guidance, role_memory, review]
+  mutable_files:
+    - .evo/roadmap.md
+    - .evo/memory/project.md
+    - .evo/memory/accepted_patterns.md
+    - .evo/memory/rulebase.md
+  read_only_context: []
+  profile_docs:
+    - .evo/memory/code/profile/repository.md
+  relationship_docs:
+    - .evo/memory/code/relationships/callgraph.md
+    - .evo/memory/code/relationships/dataflow.md
+    - .evo/memory/code/relationships/interfaces.md
+    - .evo/memory/code/relationships/validation_loop.md
+  guidance_docs:
+    - .evo/memory/guidance/programming_guidance.md
+    - .evo/memory/guidance/forbidden_rules.md
+    - .evo/memory/guidance/validation.md
+  review_docs:
+    - .evo/memory/code/review/understanding_review.md
+    - .evo/memory/code/review/coverage.json
+
 agents:
   planner:
     session_id: planner-main
@@ -104,6 +127,8 @@ agents:
   code_understanding:
     session_id: understand-main
 ```
+
+`scaffold` writes `.evo/memory/code/understanding_targets.json` from `understanding`. The target docs themselves are agent-owned and should not exist as scaffold placeholders.
 
 ## Multi-Repo Workspaces
 

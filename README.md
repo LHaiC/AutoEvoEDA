@@ -33,7 +33,7 @@ What each project provides:
 
 For the full design, paper-alignment notes, agent model, and advanced commands, see `DETAILS.md`.
 
-Status: alpha. The framework commands and example config have basic local validation, but a real project adapter has not yet been end-to-end tested. Treat the example scripts as placeholders until you provide project-specific build, regression, performance, and reward scripts.
+Status: alpha. Treat this as a framework-level harness reproduction, not a complete reproduction of the paper's ABC experiments or QoR results. The example scripts are placeholders until you provide project-specific build, regression, performance, and reward scripts.
 
 ## 2. How To Run
 
@@ -62,11 +62,14 @@ evo config validate --config examples/abc/evo.yaml
 evo config validate --config examples/multi_repo/evo.yaml
 ```
 
-Seed code-understanding memory before long runs:
+Run pre-evolution understanding before long runs:
 
 ```bash
 evo understand --config examples/abc/evo.yaml
+evo understand --config examples/abc/evo.yaml --phase scaffold
 ```
+
+`--phase scaffold` writes only raw file indexes and `.evo/memory/code/understanding_targets.json`; profiling, guidance, role memory, and review files are created by the understanding agent.
 
 Run one local evolution cycle:
 
@@ -80,6 +83,8 @@ Inspect generated artifacts:
 ls .evo/runs/
 evo report --config examples/abc/evo.yaml
 ```
+
+Agents can explicitly read `.evo/brief.md`, `.evo/history.jsonl`, `.evo/memory/lessons.jsonl`, `.evo/roadmap.md`, `.evo/agents/interactions.jsonl`, and `.evo/runs/<run_id>/agent_flow.md` to follow prior decisions, plans, and agent-to-agent exchanges. Each agent call is asked to emit `handoff_summary:` and `lesson_learned:` so the shared history stays concise.
 
 If a run is interrupted before a final decision, inspect `.evo/runs/<run_id>/state.json` and continue explicitly:
 

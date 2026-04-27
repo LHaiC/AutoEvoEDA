@@ -59,6 +59,10 @@ def render_prompt(base_prompt: str, repo: Path, cfg: EvoConfig) -> str:
         if inbox:
             sections.extend(["", "## Recent human session comments", *[item["text"] for item in inbox]])
 
+        brief = _read_if_present(repo / ".evo" / "brief.md")
+        if brief:
+            sections.extend(["", "## Shared concise history brief", brief])
+
         roadmap = _read_if_present(repo / ".evo" / "roadmap.md")
         if roadmap:
             sections.extend(["", "## Evolution roadmap", roadmap])
@@ -66,10 +70,10 @@ def render_prompt(base_prompt: str, repo: Path, cfg: EvoConfig) -> str:
         code_index = _read_if_present(repo / ".evo" / "memory" / "code" / "index.md")
         if code_index:
             sections.extend(["", "## Code understanding index", code_index])
-        for rel in ["repo_profile.md", "safe_edit_protocol.md"]:
-            content = _read_if_present(repo / ".evo" / "memory" / "code" / "bootstrap" / rel)
+        for rel in [*cfg.understanding.profile_docs, *cfg.understanding.relationship_docs, *cfg.understanding.guidance_docs]:
+            content = _read_if_present(repo / rel)
             if content:
-                sections.extend(["", f"## Bootstrap {rel}", content])
+                sections.extend(["", f"## Understanding {rel}", content])
 
         for title, agent_id in [
             ("Planner agent memory", cfg.agents.planner.session_id),
@@ -82,6 +86,15 @@ def render_prompt(base_prompt: str, repo: Path, cfg: EvoConfig) -> str:
 
         sections.extend(
             [
+                "",
+                "## Agent-readable workflow files",
+                f"- Project artifact root: `{repo}`.",
+                "- `.evo/history.jsonl`: accept/reject/promote decisions.",
+                "- `.evo/memory/lessons.jsonl`: durable lessons from previous cycles.",
+                "- `.evo/brief.md`: concise shared history for quick lookup.",
+                "- `.evo/roadmap.md`: current plan, if created by the role-memory phase or humans.",
+                "- `.evo/agents/interactions.jsonl`: planner/coder/reviewer/repair exchange chain.",
+                "- `.evo/runs/<run_id>/agent_flow.md`: per-run agent sequence.",
                 "",
                 "## Patch scope",
                 "Allowed paths:",
@@ -115,7 +128,19 @@ def render_repair_prompt(base_prompt: str, failed_gate: str, stdout: str, stderr
 def append_lesson(repo: Path, cfg: EvoConfig, record: dict[str, Any]) -> None:
     if not cfg.memory.enabled:
         return
+    reward = record.get("evaluator_results", {}).get("reward", {})
+    score = reward.get("score", "") if isinstance(reward, dict) else ""
+    lesson = {
+        "type": "cycle_decision",
+        "cycle": record.get("cycle"),
+        "run_id": record.get("run_id"),
+        "decision": record.get("decision"),
+        "reason": record.get("reason"),
+        "agent": record.get("agent"),
+        "score": score,
+        "takeaway": f"{record.get('decision')} because {record.get('reason')}",
+    }
     path = repo / cfg.memory.lessons
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a") as handle:
-        handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+        handle.write(json.dumps(lesson, ensure_ascii=False, sort_keys=True) + "\n")

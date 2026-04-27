@@ -290,11 +290,12 @@ Accepted rules are appended to `.evo/memory/rulebase.md`; rejected proposals rem
 
 ## Code Understanding Memory
 
-Seed or refresh code memory before long daemon runs:
+Seed or refresh pre-evolution memory before long daemon runs:
 
 ```bash
 evo understand --config evo.yaml
+evo understand --config evo.yaml --phase scaffold
 evo understand --config evo.yaml --module src/map/ --changed-only
 ```
 
-This writes module summaries, invariants, extension points, and workflow notes under `.evo/memory/code/`.
+`--phase scaffold` writes only raw indexes. The other phases ask Codex to directly write profile, relationship, guidance, role-memory, and review files under `.evo/memory/`.

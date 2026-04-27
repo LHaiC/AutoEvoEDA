@@ -33,6 +33,11 @@ def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:
         handle.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
 
 
+def _read_jsonl(path: Path, limit: int) -> list[dict[str, Any]]:
+    lines = path.read_text().splitlines()[-limit:] if path.exists() else []
+    return [json.loads(line) for line in lines if line.strip()]
+
+
 def project_repo(config_path: Path) -> Path:
     cfg = load_config(config_path)
     return (config_path.parent / cfg.project.repo).resolve()
@@ -104,22 +109,72 @@ def write_codex_session_event(repo: Path, agent_id: str, event: str, payload: di
     _append_jsonl(directory / "codex_session_events.jsonl", {"time": _now(), "event": event, **payload})
 
 
-def write_agent_exchange(repo: Path, agent_id: str, prompt: str, stdout: str, stderr: str, ok: bool) -> None:
+def _safe_slug(value: str) -> str:
+    return "".join(ch if ch.isalnum() or ch in "-_." else "_" for ch in value) or "agent"
+
+
+def _field(text: str, name: str) -> str:
+    prefix = name.lower() + ":"
+    for line in text.splitlines():
+        if line.lower().startswith(prefix):
+            return line.split(":", 1)[1].strip()
+    return ""
+
+
+def handoff_fields(text: str) -> dict[str, str]:
+    return {"summary": _field(text, "handoff_summary"), "lesson": _field(text, "lesson_learned")}
+
+
+def handoff_error(ok: bool, stdout: str) -> str:
+    handoff = handoff_fields(stdout)
+    return "" if not ok or (handoff["summary"] and handoff["lesson"]) else "agent response missing handoff_summary or lesson_learned"
+
+
+def write_brief(repo: Path) -> None:
+    history = read_history(repo)[-8:]
+    interactions = _read_jsonl(repo / ".evo" / "agents" / "interactions.jsonl", 12)
+    lines = ["# AutoEvoEDA Brief", "", "## Recent Decisions"]
+    lines.extend(f"- cycle {r.get('cycle')}: `{r.get('decision')}` / `{r.get('reason')}` / agent=`{r.get('agent', '')}`" for r in history)
+    lines.extend(["", "## Recent Agent Interactions"])
+    lines.extend(f"- `{r.get('phase')}` by `{r.get('agent_id')}` ok={r.get('ok')}: {r.get('summary')}" for r in interactions)
+    _write(repo / ".evo" / "brief.md", "\n".join(lines) + "\n")
+
+
+def write_agent_exchange(repo: Path, agent_id: str, prompt: str, stdout: str, stderr: str, ok: bool, run_id_value: str = "", phase: str = "", lessons_path: str = "") -> None:
     directory = agent_dir(repo, agent_id)
     directory.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
+    slug = _safe_slug(phase or "agent")
+    prompt_path = directory / "exchanges" / f"{stamp}-{slug}.prompt.md"
+    response_path = directory / "exchanges" / f"{stamp}-{slug}.response.md"
+    _write(prompt_path, prompt)
+    _write(response_path, stdout)
     (directory / "last_prompt.md").write_text(prompt)
     (directory / "last_response.md").write_text(stdout)
+    handoff = handoff_fields(stdout)
     record = {
         "time": _now(),
+        "agent_id": agent_id,
+        "run_id": run_id_value,
+        "phase": phase,
         "ok": ok,
-        "prompt_path": "last_prompt.md",
-        "response_path": "last_response.md",
+        "prompt_path": str(prompt_path.relative_to(repo)),
+        "response_path": str(response_path.relative_to(repo)),
+        "summary": handoff["summary"],
+        "lesson": handoff["lesson"],
         "stderr": stderr,
     }
     _append_jsonl(directory / "transcript.jsonl", record)
-    memory = directory / "memory.md"
-    if not memory.exists():
-        memory.write_text(f"# Agent Memory: {agent_id}\n\nAdd durable role-specific notes here.\n")
+    _append_jsonl(repo / ".evo" / "agents" / "interactions.jsonl", record)
+    if lessons_path:
+        _append_jsonl(repo / lessons_path, {**record, "type": "agent_handoff"})
+    if run_id_value:
+        flow = run_dir(repo, run_id_value) / "agent_flow.md"
+        line = f"- {record['time']} `{phase}` by `{agent_id}`: ok={ok}, summary={handoff['summary']}, prompt=`{record['prompt_path']}`, response=`{record['response_path']}`\n"
+        flow.parent.mkdir(parents=True, exist_ok=True)
+        with flow.open("a") as handle:
+            handle.write(line)
+    write_brief(repo)
 
 
 def session_dir(repo: Path) -> Path:
@@ -207,6 +262,7 @@ def read_history(repo: Path) -> list[dict[str, Any]]:
 def append_history(repo: Path, record: dict[str, Any]) -> Path:
     path = repo / ".evo" / "history.jsonl"
     _append_jsonl(path, record)
+    write_brief(repo)
     return path
 
 
@@ -356,14 +412,12 @@ def write_project_indexes(repo: Path) -> None:
     records = [r for r in read_history(repo) if "branch" in r and r.get("event") != "promote"]
     lines = ["# AutoEvoEDA Index", "", "## Recent Candidates", ""]
     lines.extend(f"- `{r['run_id']}`: `{r['decision']}` / `{r['reason']}` on `{r['branch']}`" for r in records[-20:])
-    lines.extend(["", "## Files", "", "- `history.jsonl`", "- `events.jsonl`", "- `runs/`", "- `session/`", "- `memory/`", ""])
+    lines.extend(["", "## Files", "", "- `brief.md`", "- `history.jsonl`", "- `events.jsonl`", "- `agents/interactions.jsonl`", "- `runs/`", "- `session/`", "- `memory/`", ""])
     (evo / "index.md").write_text("\n".join(lines))
-    roadmap = evo / "roadmap.md"
-    if not roadmap.exists():
-        roadmap.write_text("# Evolution Roadmap\n\n## Current Focus\n\nUse `evo session comment` to add steering notes for the next run.\n")
     runs = evo / "runs"
     runs.mkdir(parents=True, exist_ok=True)
     (runs / "README.md").write_text("# Runs\n\n" + "".join(f"- `{p.name}/`\n" for p in sorted(runs.iterdir()) if p.is_dir()))
+    write_brief(repo)
 
 
 def write_reports(repo: Path) -> Path:

@@ -165,6 +165,17 @@ class PromotionConfig:
 
 
 @dataclass(frozen=True)
+class UnderstandingConfig:
+    phases: list[str]
+    mutable_files: list[str]
+    read_only_context: list[str]
+    profile_docs: list[str]
+    relationship_docs: list[str]
+    guidance_docs: list[str]
+    review_docs: list[str]
+
+
+@dataclass(frozen=True)
 class EvoConfig:
     schema_version: str
     project: ProjectConfig
@@ -185,6 +196,7 @@ class EvoConfig:
     domain_agents: list[DomainAgentConfig]
     multi_agent: MultiAgentConfig
     promotion: PromotionConfig
+    understanding: UnderstandingConfig
 
 
 def _section(data: dict[str, Any], name: str) -> dict[str, Any]:
@@ -315,6 +327,8 @@ def load_config(path: Path) -> EvoConfig:
     agent = {"timeout_s": 3600, "sandbox": "workspace-write", "model": "", "profile": "", "config": {}, **_section(data, "agent")}
     if not isinstance(agent["config"], dict):
         raise ValueError("agent.config must be a mapping")
+    if "add_dirs" in agent["config"] and not isinstance(agent["config"]["add_dirs"], list):
+        raise ValueError("agent.config.add_dirs must be a list")
     for value in agent["config"].values():
         _check_agent_config(value)
     memory = {
@@ -340,6 +354,25 @@ def load_config(path: Path) -> EvoConfig:
         "perf": "results/perf.json",
         "reward": "results/reward.json",
         **_optional_section(data, "result_files"),
+    }
+    understanding = {
+        "phases": ["scaffold", "profile", "relationships", "guidance", "role_memory", "review"],
+        "mutable_files": [".evo/roadmap.md", ".evo/memory/project.md", ".evo/memory/accepted_patterns.md", ".evo/memory/rulebase.md"],
+        "read_only_context": [],
+        "profile_docs": [".evo/memory/code/profile/repository.md"],
+        "relationship_docs": [
+            ".evo/memory/code/relationships/callgraph.md",
+            ".evo/memory/code/relationships/dataflow.md",
+            ".evo/memory/code/relationships/interfaces.md",
+            ".evo/memory/code/relationships/validation_loop.md",
+        ],
+        "guidance_docs": [
+            ".evo/memory/guidance/programming_guidance.md",
+            ".evo/memory/guidance/forbidden_rules.md",
+            ".evo/memory/guidance/validation.md",
+        ],
+        "review_docs": [".evo/memory/code/review/understanding_review.md", ".evo/memory/code/review/coverage.json"],
+        **_optional_section(data, "understanding"),
     }
     agents_data = _optional_section(data, "agents")
     domain_agents = _domain_agents(data)
@@ -375,4 +408,5 @@ def load_config(path: Path) -> EvoConfig:
         domain_agents=domain_agents,
         multi_agent=MultiAgentConfig(**multi_agent),
         promotion=PromotionConfig(**promotion),
+        understanding=UnderstandingConfig(**understanding),
     )
