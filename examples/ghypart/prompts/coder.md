@@ -17,6 +17,8 @@ Required observable output:
 
 Constraints:
 - Do not edit adapter scripts, benchmark data, generated results, or build outputs.
+- Do not create `build/`, `results/`, or other generated artifacts under the candidate repo during self-test.
+- If you self-test, use only the injected `AUTOEVO_AGENT_BUILD_ROOT` / `AUTOEVO_AGENT_OUTPUT_ROOT` directories under `/tmp/autoevo-*`.
 - Keep changes scoped to allowed implementation paths.
 - Do not hard-code benchmark file names or special-case the tiny adapter input.
 - Preserve CUDA execution; do not replace the algorithm with a CPU-only path.

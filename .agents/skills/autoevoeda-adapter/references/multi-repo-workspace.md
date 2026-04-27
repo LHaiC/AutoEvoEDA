@@ -80,9 +80,12 @@ Pipeline commands run from the candidate workspace root and receive:
 AUTOEVO_ADAPTER_ROOT=/path/to/adapter-repo
 AUTOEVO_CANDIDATE_ROOT=/path/to/candidate-workspace
 AUTOEVO_RUNNER_SANDBOX=danger-full-access
+AUTOEVO_RUNNER_SCRATCH_ROOT=/tmp/autoevo-project/cycle-001/runner
+AUTOEVO_RUNNER_BUILD_ROOT=/tmp/autoevo-project/cycle-001/runner/build
+AUTOEVO_RUNNER_OUTPUT_ROOT=/tmp/autoevo-project/cycle-001/runner/outputs
 ```
 
-Scripts should read adapter-owned data from `$AUTOEVO_ADAPTER_ROOT` and run project commands under `$AUTOEVO_CANDIDATE_ROOT`.
+Scripts should read adapter-owned data from `$AUTOEVO_ADAPTER_ROOT`, run project commands against `$AUTOEVO_CANDIDATE_ROOT`, and put build products under `$AUTOEVO_RUNNER_BUILD_ROOT`. Keep only configured framework result files under the candidate workspace so `.evo` can collect them.
 
 ## Promotion
 

@@ -21,6 +21,10 @@ def _tail_lines(path: Path, count: int) -> list[str]:
     return lines[-count:]
 
 
+def _tail_jsonl(path: Path, count: int) -> list[dict[str, Any]]:
+    return [json.loads(line) for line in _tail_lines(path, count) if line.strip()]
+
+
 def _role_section(repo: Path, title: str, path: str, base_prompt: str) -> list[str]:
     if not path:
         return []
@@ -51,7 +55,8 @@ def render_prompt(base_prompt: str, repo: Path, cfg: EvoConfig) -> str:
         if rejected_ideas:
             sections.extend(["", "## Recent rejected ideas", *rejected_ideas])
 
-        lessons = _tail_lines(repo / cfg.memory.lessons, cfg.memory.inject_recent_cycles)
+        lesson_rows = _tail_jsonl(repo / cfg.memory.lessons, cfg.memory.inject_recent_cycles)
+        lessons = [f"- {row.get('phase', row.get('run_id', 'cycle'))}: {row.get('lesson') or row.get('takeaway')}" for row in lesson_rows if row.get("lesson") or row.get("takeaway")]
         if lessons:
             sections.extend(["", "## Recent lessons", *lessons])
 

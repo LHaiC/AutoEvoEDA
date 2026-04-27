@@ -48,6 +48,8 @@ Read `references/evo-yaml.md`. For sibling-repo workspaces, also read `reference
 
 - `guards.allowed_paths` contains implementation scopes only.
 - `guards.forbidden_paths` includes evaluator scripts, config, generated results, benchmark/golden assets, and CI.
+- Candidate agents that self-test must write build/output artifacts only under injected `AUTOEVO_AGENT_*` `/tmp/autoevo-*` directories, never under guarded project paths such as `build/` or `results/`.
+- Evaluator scripts should build under `AUTOEVO_RUNNER_BUILD_ROOT` and keep only framework-collected result JSON under the configured result path.
 - Leave `agent.model/profile/config` empty in public examples unless reproducibility requires generic Codex overrides.
 - `agent.sandbox` is for Codex code editing; `runner.sandbox` is for evaluator/pipeline requirements and should be paired with `runner.preflight` for CUDA-only runs.
 - `domain_agents` requires `multi_agent.planner: true` and `roles.planner_prompt`.

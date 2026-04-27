@@ -39,11 +39,32 @@ from autoevoeda.workspace.git import Candidate, candidate_diff, commit_candidate
 from autoevoeda.workspace.guard import GuardResult, check_candidate_scope
 
 
-def _pipeline_env(repo: Path, candidate: Candidate, cfg: EvoConfig) -> dict[str, str]:
+def _slug(value: str) -> str:
+    return "".join(ch if ch.isalnum() or ch in "-_." else "-" for ch in value).strip("-") or "project"
+
+
+def _scratch(cfg: EvoConfig, run_id_value: str, owner: str) -> Path:
+    return Path("/tmp") / f"autoevo-{_slug(cfg.project.name)}" / run_id_value / _slug(owner)
+
+
+def _runner_env(repo: Path, candidate: Candidate, cfg: EvoConfig, run_id_value: str) -> dict[str, str]:
+    root = _scratch(cfg, run_id_value, "runner")
     return {
         "AUTOEVO_ADAPTER_ROOT": str(repo),
         "AUTOEVO_CANDIDATE_ROOT": str(candidate.path),
         "AUTOEVO_RUNNER_SANDBOX": cfg.runner.sandbox,
+        "AUTOEVO_RUNNER_SCRATCH_ROOT": str(root),
+        "AUTOEVO_RUNNER_BUILD_ROOT": str(root / "build"),
+        "AUTOEVO_RUNNER_OUTPUT_ROOT": str(root / "outputs"),
+    }
+
+
+def _agent_env(cfg: EvoConfig, run_id_value: str, agent_id: str) -> dict[str, str]:
+    root = _scratch(cfg, run_id_value, agent_id)
+    return {
+        "AUTOEVO_AGENT_SCRATCH_ROOT": str(root),
+        "AUTOEVO_AGENT_BUILD_ROOT": str(root / "build"),
+        "AUTOEVO_AGENT_OUTPUT_ROOT": str(root / "outputs"),
     }
 
 
@@ -121,7 +142,7 @@ def _check_guard(candidate: Candidate, cfg: EvoConfig, cycle_dir: Path, domain_a
 
 def _run_pipeline(candidate: Candidate, cfg: EvoConfig, cycle_dir: Path, repo: Path, run_id_value: str) -> tuple[bool, str, CommandResult | None, list[CommandResult]]:
     results = []
-    env = _pipeline_env(repo, candidate, cfg)
+    env = _runner_env(repo, candidate, cfg, run_id_value)
     if cfg.runner.preflight:
         result = run_cmd(name="runner_preflight", cmd=cfg.runner.preflight, cwd=candidate.path, env=env)
         _checkpoint(repo, run_id_value, "runner_preflight_finished", candidate)
@@ -193,8 +214,19 @@ def _run_agent(
     prompt: str,
     event_payload: dict[str, object] | None = None,
 ) -> AgentResult:
+    env = _agent_env(cfg, run_id_value, role.session_id)
+    prompt = prompt.rstrip() + "\n\n# Agent Scratch Directories\n"
+    prompt += "\n".join(
+        [
+            f"AUTOEVO_AGENT_SCRATCH_ROOT={env['AUTOEVO_AGENT_SCRATCH_ROOT']}",
+            f"AUTOEVO_AGENT_BUILD_ROOT={env['AUTOEVO_AGENT_BUILD_ROOT']}",
+            f"AUTOEVO_AGENT_OUTPUT_ROOT={env['AUTOEVO_AGENT_OUTPUT_ROOT']}",
+            "If you self-test, write generated build/output artifacts only under these directories.",
+            "Do not create candidate-local build, results, or generated-output directories.",
+        ]
+    )
     prompt = _handoff_instruction(prompt)
-    result = run_codex_role(repo, role, agent, prompt, candidate.path, cfg.agent.timeout_s)
+    result = run_codex_role(repo, role, agent, prompt, candidate.path, cfg.agent.timeout_s, env)
     error = handoff_error(result.ok, result.stdout)
     if error:
         result = AgentResult(False, result.stdout, error, result.session_mode)
@@ -337,6 +369,10 @@ def run_one_cycle(
         prompt += f"AUTOEVO_ADAPTER_ROOT={repo}\n"
         prompt += f"AUTOEVO_CANDIDATE_ROOT={candidate.path}\n"
         prompt += f"AUTOEVO_RUNNER_SANDBOX={cfg.runner.sandbox}\n"
+        runner_env = _runner_env(repo, candidate, cfg, run_id_value)
+        prompt += f"AUTOEVO_RUNNER_SCRATCH_ROOT={runner_env['AUTOEVO_RUNNER_SCRATCH_ROOT']}\n"
+        prompt += f"AUTOEVO_RUNNER_BUILD_ROOT={runner_env['AUTOEVO_RUNNER_BUILD_ROOT']}\n"
+        prompt += f"AUTOEVO_RUNNER_OUTPUT_ROOT={runner_env['AUTOEVO_RUNNER_OUTPUT_ROOT']}\n"
         prompt += "Repos:\n" + "\n".join(f"- {item.name}: {item.path}" for item in candidate.repos) + "\n"
     if planner_notes:
         prompt += "\n# Planner Notes\n" + planner_notes + "\n"

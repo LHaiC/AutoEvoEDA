@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 import json
+import os
 import subprocess
 
 from autoevoeda.artifacts import read_codex_session, write_codex_session_event
@@ -25,7 +26,7 @@ class CodexBackend:
         self.profile = profile
         self.config = config or {}
 
-    def run(self, prompt: str, cwd: Path, timeout_s: int, session_id: str = "") -> AgentResult:
+    def run(self, prompt: str, cwd: Path, timeout_s: int, session_id: str = "", env: dict[str, str] | None = None) -> AgentResult:
         cmd = ["codex", "exec", *self._model_args(include_profile=True, include_add_dirs=True), "--full-auto", "--sandbox", self.sandbox, "--skip-git-repo-check", "-"]
         mode = "new"
         if session_id:
@@ -39,6 +40,7 @@ class CodexBackend:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=timeout_s,
+            env={**os.environ, **(env or {})},
         )
         return AgentResult(ok=proc.returncode == 0, stdout=proc.stdout, stderr=proc.stderr, session_mode=mode)
 
@@ -77,10 +79,11 @@ def run_codex_role(
     prompt: str,
     cwd: Path,
     timeout_s: int,
+    env: dict[str, str] | None = None,
 ) -> AgentResult:
     cfg = role.codex_session
     session_id = read_codex_session(repo, role.session_id, cfg.session_file) if cfg.enabled else ""
-    result = agent.run(prompt, cwd, timeout_s, session_id)
+    result = agent.run(prompt, cwd, timeout_s, session_id, env)
     if cfg.enabled:
         write_codex_session_event(repo, role.session_id, result.session_mode, {"ok": result.ok, "session_id": session_id})
     return result

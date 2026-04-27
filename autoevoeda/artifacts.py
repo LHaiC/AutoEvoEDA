@@ -130,13 +130,37 @@ def handoff_error(ok: bool, stdout: str) -> str:
     return "" if not ok or (handoff["summary"] and handoff["lesson"]) else "agent response missing handoff_summary or lesson_learned"
 
 
+def _cycle_digest(record: dict[str, Any]) -> str:
+    reward = record.get("evaluator_results", {}).get("reward", {})
+    correctness = record.get("evaluator_results", {}).get("correctness", {})
+    score = reward.get("score") if isinstance(reward, dict) else None
+    flags = []
+    if isinstance(correctness, dict):
+        flags = [key for key in sorted(correctness) if correctness.get(key) is True and key != "expected_weighted_summary"]
+    suffix = []
+    if score != "" and score is not None:
+        suffix.append(f"score={score}")
+    if flags:
+        suffix.append("ok=" + ",".join(flags[:4]))
+    extra = " / " + " / ".join(suffix) if suffix else ""
+    return (
+        f"- cycle {record.get('cycle')}: `{record.get('decision')}` / `{record.get('reason')}` "
+        f"/ files={record.get('changed_files', 0)} lines={record.get('changed_lines', 0)} "
+        f"/ agent=`{record.get('agent', '')}`{extra}"
+    )
+
+
 def write_brief(repo: Path) -> None:
     history = read_history(repo)[-8:]
     interactions = _read_jsonl(repo / ".evo" / "agents" / "interactions.jsonl", 12)
-    lines = ["# AutoEvoEDA Brief", "", "## Recent Decisions"]
-    lines.extend(f"- cycle {r.get('cycle')}: `{r.get('decision')}` / `{r.get('reason')}` / agent=`{r.get('agent', '')}`" for r in history)
+    lessons = _read_jsonl(repo / ".evo" / "memory" / "lessons.jsonl", 8)
+    lines = ["# AutoEvoEDA Brief", "", "## Recent Cycle Digest"]
+    lines.extend(_cycle_digest(r) for r in history)
     lines.extend(["", "## Recent Agent Interactions"])
     lines.extend(f"- `{r.get('phase')}` by `{r.get('agent_id')}` ok={r.get('ok')}: {r.get('summary')}" for r in interactions)
+    if lessons:
+        lines.extend(["", "## Compressed Lessons"])
+        lines.extend(f"- {r.get('phase', r.get('run_id', 'cycle'))}: {r.get('lesson') or r.get('takeaway')}" for r in lessons if r.get("lesson") or r.get("takeaway"))
     _write(repo / ".evo" / "brief.md", "\n".join(lines) + "\n")
 
 
@@ -147,8 +171,10 @@ def write_agent_exchange(repo: Path, agent_id: str, prompt: str, stdout: str, st
     slug = _safe_slug(phase or "agent")
     prompt_path = directory / "exchanges" / f"{stamp}-{slug}.prompt.md"
     response_path = directory / "exchanges" / f"{stamp}-{slug}.response.md"
+    stderr_path = directory / "exchanges" / f"{stamp}-{slug}.stderr"
     _write(prompt_path, prompt)
     _write(response_path, stdout)
+    _write(stderr_path, stderr)
     (directory / "last_prompt.md").write_text(prompt)
     (directory / "last_response.md").write_text(stdout)
     handoff = handoff_fields(stdout)
@@ -160,9 +186,9 @@ def write_agent_exchange(repo: Path, agent_id: str, prompt: str, stdout: str, st
         "ok": ok,
         "prompt_path": str(prompt_path.relative_to(repo)),
         "response_path": str(response_path.relative_to(repo)),
+        "stderr_path": str(stderr_path.relative_to(repo)),
         "summary": handoff["summary"],
         "lesson": handoff["lesson"],
-        "stderr": stderr,
     }
     _append_jsonl(directory / "transcript.jsonl", record)
     _append_jsonl(repo / ".evo" / "agents" / "interactions.jsonl", record)

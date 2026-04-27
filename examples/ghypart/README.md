@@ -54,4 +54,6 @@ evo run --config examples/ghypart/evo.yaml --cycles 1
 
 The evaluator is CUDA-only. `runner.preflight` checks NVIDIA device visibility before build/regression/perf gates. Candidate code agents remain scoped by guards; evaluator access is recorded with `runner.sandbox: danger-full-access`.
 
+If an agent self-tests before handing off, it must use only its injected `/tmp/autoevo-*` build/output directories. The evaluator also builds under `AUTOEVO_RUNNER_BUILD_ROOT`, while result JSON remains under the candidate workspace `results/` for framework collection. Candidate-local source-repo paths such as `ghypart/build/` are forbidden and will be rejected by guards.
+
 Do not commit generated `.evo/`, `.evo-worktrees/`, source build directories, datasets, or benchmark results.

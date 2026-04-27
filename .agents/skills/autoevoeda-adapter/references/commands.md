@@ -38,6 +38,8 @@ tail -n 20 .evo/memory/lessons.jsonl
 tail -n 20 .evo/agents/interactions.jsonl
 ```
 
+`.evo/brief.md` is the high-density cross-cycle summary injected into future prompts. Full stdout/stderr stays in `.evo/runs/<run_id>/` and `.evo/agents/*/exchanges/`; do not paste those logs into prompt files unless debugging a specific failure.
+
 Run a file-controlled long loop:
 
 ```bash

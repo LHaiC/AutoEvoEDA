@@ -86,7 +86,9 @@ ls .evo/runs/
 evo report --config examples/abc/evo.yaml
 ```
 
-Agents can explicitly read `.evo/brief.md`, `.evo/history.jsonl`, `.evo/memory/lessons.jsonl`, `.evo/roadmap.md`, `.evo/agents/interactions.jsonl`, and `.evo/runs/<run_id>/agent_flow.md` to follow prior decisions, plans, and agent-to-agent exchanges. Each agent call is asked to emit `handoff_summary:` and `lesson_learned:` so the shared history stays concise.
+Agents can explicitly read `.evo/brief.md`, `.evo/history.jsonl`, `.evo/memory/lessons.jsonl`, `.evo/roadmap.md`, `.evo/agents/interactions.jsonl`, and `.evo/runs/<run_id>/agent_flow.md` to follow prior decisions, plans, and agent-to-agent exchanges. `.evo/brief.md` is the compressed cross-cycle digest injected into prompts; full stdout/stderr stays behind artifact paths. Each agent call is asked to emit `handoff_summary:` and `lesson_learned:` so the shared history stays concise.
+
+Each agent and runner receives dedicated `/tmp/autoevo-*` scratch variables. Candidate agents should self-test only under `AUTOEVO_AGENT_BUILD_ROOT` or `AUTOEVO_AGENT_OUTPUT_ROOT`; evaluator scripts should build under `AUTOEVO_RUNNER_BUILD_ROOT`.
 
 If a run is interrupted before a final decision, inspect `.evo/runs/<run_id>/state.json` and continue explicitly:
 
