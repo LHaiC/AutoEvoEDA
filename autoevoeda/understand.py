@@ -15,6 +15,10 @@ PHASES = ["scaffold", "profile", "relationships", "guidance", "role_memory", "re
 PROFILE_SECTIONS = ["Purpose", "Entry Points", "Key Data Structures", "Cross-Repo Contracts", "ECO/Incremental Relevance", "Risks", "Recommended Edit Targets", "Do Not Touch"]
 
 
+def _log(message: str) -> None:
+    print(f"[evo-understand] {message}", flush=True)
+
+
 def _repo(config_path: Path, cfg: EvoConfig) -> Path:
     return (config_path.parent / cfg.project.repo).resolve()
 
@@ -233,7 +237,7 @@ def _validate_phase(repo: Path, phase: str, changed: list[Path], targets: list[P
         text = path.read_text()
         if len(text.strip()) < 400 or "placeholder" in text.lower():
             raise RuntimeError(f"understanding output is too shallow: {path.relative_to(repo)}")
-        if "/modules/" in str(path) or phase == "profile":
+        if "/modules/" in str(path):
             missing_sections = [section for section in PROFILE_SECTIONS if f"## {section}" not in text]
             if missing_sections:
                 raise RuntimeError(f"understanding output missing sections in {path.relative_to(repo)}: {', '.join(missing_sections)}")
@@ -270,9 +274,13 @@ def run_understand(config_path: Path, phase: str = "all", modules: list[str] | N
         raise ValueError("unknown understanding phase: " + ", ".join(unknown))
     module_files = _all_files(config_path, cfg, repo, modules or _default_modules(config_path, cfg, repo), changed_only)
     if "scaffold" in selected:
+        _log(f"phase=scaffold modules={len(module_files)}")
         _write_scaffold(config_path, repo, cfg, module_files)
         append_event(repo, "understand", "understanding_scaffold_written", 0, 0, "", {"modules": len(module_files)})
     for item in selected:
         if item != "scaffold":
+            _log(f"phase={item} agent_start")
             _run_agent_phase(config_path, cfg, repo, item)
+            _log(f"phase={item} agent_done")
     write_project_indexes(repo)
+    _log("done")

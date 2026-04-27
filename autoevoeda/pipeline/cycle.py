@@ -41,6 +41,10 @@ from autoevoeda.workspace.git import Candidate, candidate_diff, commit_candidate
 from autoevoeda.workspace.guard import GuardResult, check_candidate_scope
 
 
+def _log(message: str) -> None:
+    print(f"[evo] {message}", flush=True)
+
+
 def _slug(value: str) -> str:
     return "".join(ch if ch.isalnum() or ch in "-_." else "-" for ch in value).strip("-") or "project"
 
@@ -116,6 +120,7 @@ def _record_decision(
     _event(repo, run_id_value, "decision_recorded", candidate, {"decision": decision, "reason": reason})
     write_run_state(repo, run_id_value, "decision_recorded", candidate.cycle, candidate.index, candidate.branch, str(candidate.path))
     clear_active_run(repo)
+    _log(f"{run_id_value} decision={decision} reason={reason}")
     return record
 
 
@@ -148,11 +153,13 @@ def _run_pipeline(candidate: Candidate, cfg: EvoConfig, cycle_dir: Path, repo: P
     results = []
     env = _runner_env(repo, candidate, cfg, run_id_value)
     if cfg.runner.preflight:
+        _log(f"{run_id_value} gate=runner_preflight start")
         result = run_cmd(name="runner_preflight", cmd=cfg.runner.preflight, cwd=candidate.path, env=env)
         _checkpoint(repo, run_id_value, "runner_preflight_finished", candidate)
         results.append(result)
         _write_command_result(cycle_dir, result)
         _event(repo, run_id_value, "runner_preflight_finished", candidate, {"ok": result.ok, "returncode": result.returncode, "runner_sandbox": cfg.runner.sandbox})
+        _log(f"{run_id_value} gate=runner_preflight ok={result.ok} rc={result.returncode}")
         if not result.ok:
             write_benchmark_doc(repo, run_id_value, results)
             return False, "runner_preflight_failed", result, results
@@ -163,11 +170,13 @@ def _run_pipeline(candidate: Candidate, cfg: EvoConfig, cycle_dir: Path, repo: P
         ("perf", cfg.pipeline.perf),
         ("reward", cfg.pipeline.reward),
     ]:
+        _log(f"{run_id_value} gate={name} start")
         result = run_cmd(name=name, cmd=cmd, cwd=candidate.path, env=env)
         _checkpoint(repo, run_id_value, f"{name}_finished", candidate)
         results.append(result)
         _write_command_result(cycle_dir, result)
         _event(repo, run_id_value, "gate_finished", candidate, {"gate": name, "ok": result.ok, "returncode": result.returncode})
+        _log(f"{run_id_value} gate={name} ok={result.ok} rc={result.returncode}")
         if not result.ok:
             write_benchmark_doc(repo, run_id_value, results)
             return False, f"{name}_failed", result, results
@@ -230,6 +239,7 @@ def _run_agent(
         ]
     )
     prompt = _handoff_instruction(prompt)
+    _log(f"{run_id_value} agent={role.session_id} phase={phase} start")
     result = run_codex_role(repo, role, agent, prompt, candidate.path, cfg.agent.timeout_s, env)
     error = handoff_error(result.ok, result.stdout)
     if error:
@@ -240,6 +250,7 @@ def _run_agent(
     write_agent_exchange(repo, role.session_id, prompt, result.stdout, result.stderr, result.ok, run_id_value, phase, cfg.memory.lessons if cfg.memory.enabled else "")
     payload = {"ok": result.ok, **(event_payload or {})}
     _event(repo, run_id_value, f"{phase}_finished", candidate, payload)
+    _log(f"{run_id_value} agent={role.session_id} phase={phase} ok={result.ok} mode={result.session_mode}")
     return result
 
 
@@ -313,6 +324,7 @@ def run_one_cycle(
 ) -> dict[str, object]:
     repo = (config_path.parent / cfg.project.repo).resolve()
     run_id_value = run_id(cycle, candidate_index, pool_size)
+    _log(f"{run_id_value} start project={cfg.project.name}")
     if cfg.workspace.mode == "multi_repo":
         candidate = create_candidate_workspace(
             adapter_repo=repo,
@@ -337,6 +349,7 @@ def run_one_cycle(
     _checkpoint(repo, run_id_value, "candidate_created", candidate)
     write_context_doc(repo, run_id_value, config_path, cfg, candidate)
     _event(repo, run_id_value, "candidate_created", candidate, {"candidate": str(candidate.path)})
+    _log(f"{run_id_value} candidate={candidate.path}")
     agent = CodexBackend(sandbox=cfg.agent.sandbox, model=cfg.agent.model, profile=cfg.agent.profile, config=cfg.agent.config)
 
     planner_notes = ""
@@ -408,6 +421,7 @@ def run_one_cycle(
     _checkpoint(repo, run_id_value, "guard_finished", candidate)
     write_implement_doc(repo, run_id_value, candidate, guard)
     _event(repo, run_id_value, "guard_finished", candidate, asdict(guard))
+    _log(f"{run_id_value} guard ok={guard.ok} files={guard.changed_files} lines={guard.changed_lines} reason={guard.reason}")
     if not guard.ok:
         return _record_decision(repo, run_id_value, candidate, "reject", f"guard_failed:{guard.reason}", guard, cfg, agent=agent_name)
 
